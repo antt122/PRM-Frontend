@@ -7,4 +7,5 @@ const Color kPrimaryTextColor = Color(0xFF423A30);
 const Color kAccentColor = Color(0xFFC8B593);
 const Color kHighlightColor = Color(0xFFEFEBE0);
 const Color kRecommendedPlanColor = Color(0xFFD6C8A6);
+const Color kInputBorderColor = Color(0xFFC4B89A);
 
