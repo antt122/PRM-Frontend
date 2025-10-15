@@ -39,6 +39,7 @@ dependencies:
   # Dành cho việc xử lý file multipart (cần cho ApiService)
   http_parser: ^4.0.2
   http: ^1.2.1
+  audioplayers: ^6.0.0
 
 
   # The following adds the Cupertino Icons font to your application.

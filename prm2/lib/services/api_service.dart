@@ -1,23 +1,26 @@
 
 import 'dart:convert';
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/api_result.dart';
 import '../models/creator_application.dart';
 import '../models/creator_application_status.dart';
 import '../models/login_data.dart';
 import '../models/my_post.dart';
+import '../models/post_detail.dart';
 import '../models/subscription_plan.dart';
 import '../models/user_profile.dart';
 
 class ApiService {
 
-  static const String _baseUrl = 'https://a572fec15611.ngrok-free.app/api/user/auth'; // Dùng baseUrl để dễ quản lý
+  static const String _baseUrl = 'http://localhost:5001/api/user/auth'; // Dùng baseUrl để dễ quản lý
   static const String _baseUrlSub = 'https://a572fec15611.ngrok-free.app/api/user';
-  static const String _creatorApiBaseUrl = 'https://a572fec15611.ngrok-free.app/api';
-  static const String _creatorBaseUrl = 'https://a572fec15611.ngrok-free.app/api';
+  static const String _creatorApiBaseUrl = 'http://localhost:5002/api';
+  static const String _creatorBaseUrl = 'http://localhost:5004/api';
 
 
   static const String _registerUrl = '$_baseUrl/register';
@@ -28,6 +31,7 @@ class ApiService {
   static const String _creatorApplicationUrl = '$_creatorApiBaseUrl/CreatorApplications';
   static const String _creatorStatusUrl = '$_creatorApiBaseUrl/CreatorApplications/my-status';
   static const String _creatorPodcastsUrl = '$_creatorBaseUrl/creator/podcasts';
+  static const String _viewPodcastsUrl = '$_creatorBaseUrl/user/podcasts';
 
 // --- HÀM HELPER MỚI ĐỂ LẤY HEADER CÓ TOKEN ---
   static Future<Map<String, String>> _getAuthHeaders() async {
@@ -369,4 +373,110 @@ class ApiService {
   }
 
 
+
+  // The main function to create a podcast
+  Future<ApiResult<MyPost>> createPodcast({
+    required String title,
+    required String description,
+    required Uint8List thumbnailBytes,
+    required String thumbnailFileName,
+    required Uint8List audioBytes,
+    required String audioFileName,
+    required String seriesName,
+    required String guestName,
+    required int episodeNumber,
+    required String hostName,
+    required int duration,
+    required String tags,
+    required String transcriptUrl,
+    required List<int> topicCategoryIds,   // Accepts a list
+    required List<int> emotionCategoryIds, // Accepts a list
+  }) async {
+    final uri = Uri.parse(_creatorPodcastsUrl);
+    try {
+      var request = http.MultipartRequest('POST', uri);
+
+      // Automatically get and add the auth token
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken');
+      if (token == null) {
+        return ApiResult(isSuccess: false, message: "User is not logged in.");
+      }
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['accept'] = 'application/json';
+
+      // Add all text fields
+      request.fields.addAll({
+        'Title': title,
+        'Description': description,
+        'SeriesName': seriesName,
+        'GuestName': guestName,
+        'EpisodeNumber': episodeNumber.toString(),
+        'HostName': hostName,
+        'Duration': duration.toString(),
+        'Tags': tags,
+        'TranscriptUrl': transcriptUrl,
+      });
+
+      // Add array fields correctly for multipart/form-data
+      for (int i = 0; i < topicCategoryIds.length; i++) {
+        request.fields['TopicCategories[$i]'] = topicCategoryIds[i].toString();
+      }
+      for (int i = 0; i < emotionCategoryIds.length; i++) {
+        request.fields['EmotionCategories[$i]'] = emotionCategoryIds[i].toString();
+      }
+
+      // Add files from bytes (works on mobile and web)
+      request.files.add(http.MultipartFile.fromBytes(
+        'ThumbnailFile',
+        thumbnailBytes,
+        filename: thumbnailFileName,
+        contentType: MediaType('image', 'jpeg'), // Assuming jpeg
+      ));
+      request.files.add(http.MultipartFile.fromBytes(
+        'AudioFile',
+        audioBytes,
+        filename: audioFileName,
+        contentType: MediaType('audio', 'mpeg'),
+      ));
+
+      // Send the request and get the response
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // Handle the response
+      if (response.statusCode == 201) { // 201 Created
+        return ApiResult(
+          isSuccess: true,
+          data: MyPost.fromJson(jsonDecode(response.body)),
+        );
+      } else {
+        return ApiResult(
+          isSuccess: false,
+          message: 'Error ${response.statusCode}: ${response.body}',
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'An exception occurred: ${e.toString()}');
+    }
+  }
+
+  Future<ApiResult<PostDetail>> getPostDetails(String postId) async {
+    final url = Uri.parse('$_viewPodcastsUrl/$postId');
+    try {
+      final response = await http.get(url, headers: {'Content-Type': 'application/json'});
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        return ApiResult(
+          isSuccess: true,
+          data: PostDetail.fromJson(jsonResponse),
+        );
+      } else {
+        return ApiResult(isSuccess: false, message: 'Lỗi ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Lỗi ngoại lệ: ${e.toString()}');
+    }
+  }
 }

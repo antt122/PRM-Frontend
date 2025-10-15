@@ -11,4 +11,8 @@ const Color kInputBorderColor = Color(0xFFC4B89A);
 const Color kPrimaryColor = Color(0xFFB5935F); // Nâu vàng chính
 const Color kErrorColor = Color(0xFFD32F2F); // Đỏ cho lỗi
 const Color kSuccessColor = Color(0xFF4CAF50);
+const Color kBackgroundColorBlack = Color(0xFF121212); // Nền đen sâu
+const Color kCardBackgroundColor = Color(0xFF1E1E1E); // Nền cho các thẻ postcard
+const Color kSecondaryTextColor = Color(0xFFB3B3B3); // Màu chữ phụ (xám)
+const Color kAccentColorGreen = Color(0xFF1DB954); // Màu nhấn (xanh lá)
 
