@@ -1,5 +1,6 @@
 class UserProfile {
   // --- CÁC TRƯỜNG ĐÃ KHỚP VỚI API THẬT ---
+  final String id;
   final String fullName;
   final String email;
   final String phoneNumber; // API có thể trả về null
@@ -7,6 +8,7 @@ class UserProfile {
 
 
   UserProfile({
+    required this.id,
     required this.fullName,
     required this.email,
     required this.phoneNumber,
@@ -19,11 +21,13 @@ class UserProfile {
     final data = json['data'] as Map<String, dynamic>? ?? {};
 
     return UserProfile(
+      id: data['id'] as String? ?? '',
       fullName: data['fullName'] as String? ?? 'Chưa có tên',
       email: data['email'] as String? ?? 'Chưa có email',
       phoneNumber: data['phoneNumber'] as String? ?? '', // Giữ nguyên null nếu không có
       address: data['address'] as String? ?? '',
     );
   }
+
 }
 
