@@ -1,10 +1,11 @@
+
 import 'dart:convert';
 
 class SubscriptionPlan {
+  final String id;
   final String name;
   final String displayName;
   final String description;
-  // --- THAY ĐỔI: Chuyển từ String sang List<String> ---
   final List<String> features;
   final String currency;
   final int billingPeriodCount;
@@ -14,10 +15,10 @@ class SubscriptionPlan {
   final String status;
 
   SubscriptionPlan({
+    required this.id,
     required this.name,
     required this.displayName,
     required this.description,
-    // --- THAY ĐỔI: Cập nhật constructor ---
     required this.features,
     required this.currency,
     required this.billingPeriodCount,
@@ -28,17 +29,14 @@ class SubscriptionPlan {
   });
 
   factory SubscriptionPlan.fromJson(Map<String, dynamic> json) {
-    // Giả định rằng 'featureConfig' là một chuỗi các tính năng,
-    // phân cách nhau bằng dấu chấm phẩy ';'.
-    // Ví dụ: "Nghe podcast;Không quảng cáo;Playlist và My podcast"
     final featureConfigString = json['featureConfig'] as String? ?? '';
     final featuresList = featureConfigString.split(';').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
     return SubscriptionPlan(
+      id: json['id'] as String, // Thêm ID
       name: json['name'] as String,
       displayName: json['displayName'] as String,
       description: json['description'] as String,
-      // --- THAY ĐỔI: Parse chuỗi thành một danh sách ---
       features: featuresList,
       currency: json['currency'] as String,
       billingPeriodCount: json['billingPeriodCount'] as int,
@@ -49,4 +47,3 @@ class SubscriptionPlan {
     );
   }
 }
-

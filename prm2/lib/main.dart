@@ -1,9 +1,12 @@
 // File: main.dart (PHIÊN BẢN MỚI, ĐƠN GIẢN HÓA)
 
 import 'package:flutter/material.dart';
-import 'screens/login_screen.dart'; // Chỉ cần import LoginScreen
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/splash_screen.dart'; // Import màn hình Splash mới
 
-void main() {
+Future<void> main() async {
+  // Load the .env file
+  await dotenv.load(fileName: ".env");
   runApp(const MyApp());
 }
 
@@ -22,8 +25,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF8B6B3E)),
         useMaterial3: true,
       ),
-      // Chỉ cần trỏ thẳng đến LoginScreen là xong
-      home: const LoginScreen(),
+      // Màn hình bắt đầu bây giờ là SplashScreen
+      home: const SplashScreen(),
     );
   }
 }
