@@ -1,8 +1,12 @@
 
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:prm2/models/my_subscription.dart';
+import 'package:prm2/models/payment_method.dart';
+import 'package:prm2/models/subscription_registration_response.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/api_result.dart';
 import '../models/creator_application.dart';
@@ -11,38 +15,231 @@ import '../models/login_data.dart';
 import '../models/my_post.dart';
 import '../models/subscription_plan.dart';
 import '../models/user_profile.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ApiService {
+  // --- CÁC URL ĐƯỢC CHUYỂN THÀNH GETTER ĐỂ TRÁNH RACE CONDITION ---
+  static String get _baseUrl => dotenv.env['BASE_URL'] ?? '';
 
-  static const String _baseUrl = 'https://a572fec15611.ngrok-free.app/api/user/auth'; // Dùng baseUrl để dễ quản lý
-  static const String _baseUrlSub = 'https://a572fec15611.ngrok-free.app/api/user';
-  static const String _creatorApiBaseUrl = 'https://a572fec15611.ngrok-free.app/api';
-  static const String _creatorBaseUrl = 'https://a572fec15611.ngrok-free.app/api';
+  static String get _authUrl => '$_baseUrl/user/auth';
+  static String get _userUrl => '$_baseUrl/user';
+  static String get _creatorApiUrl => '$_baseUrl';
+  static String get _cmsUrl => '$_baseUrl/cms';
 
-
-  static const String _registerUrl = '$_baseUrl/register';
-  static const String _verifyOtpUrl = '$_baseUrl/verify-otp';
-  static const String _loginUrl = '$_baseUrl/login';
-  static const String _plansUrl = 'https://a572fec15611.ngrok-free.app/api/cms/subscription-plans';
-  static const String _checkoutUrl = '$_baseUrlSub/profile';
-  static const String _creatorApplicationUrl = '$_creatorApiBaseUrl/CreatorApplications';
-  static const String _creatorStatusUrl = '$_creatorApiBaseUrl/CreatorApplications/my-status';
-  static const String _creatorPodcastsUrl = '$_creatorBaseUrl/creator/podcasts';
+  static String get _registerUrl => '$_authUrl/register';
+  static String get _verifyOtpUrl => '$_authUrl/verify-otp';
+  static String get _loginUrl => '$_authUrl/login';
+  static String get _plansUrl => '$_userUrl/subscription-plans';
+  static String get _paymentMethodsUrl => '$_userUrl/payment-methods';
+  static String get _registerSubscriptionUrl => '$_userUrl/subscriptions/register';
+  static String get _mySubscriptionUrl => '$_userUrl/subscriptions/me'; // <-- THÊM MỚI
+  static String get _checkoutUrl => '$_userUrl/profile';
+  static String get _creatorApplicationUrl => '$_creatorApiUrl/CreatorApplications';
+  static String get _creatorStatusUrl => '$_creatorApiUrl/CreatorApplications/my-status';
+  static String get _creatorPodcastsUrl => '$_creatorApiUrl/creator/podcasts';
+  static String get _createPodcastUrl => '$_creatorApiUrl/creator/podcasts';
 
 // --- HÀM HELPER MỚI ĐỂ LẤY HEADER CÓ TOKEN ---
   static Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken'); // Lấy token đã lưu
+    final token = prefs.getString('accessToken');
 
     if (token != null) {
-      // Nếu có token, trả về header Authorization theo chuẩn Bearer
       return {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       };
     }
-    // Nếu không có token, trả về header mặc định
     return {'Content-Type': 'application/json'};
+  }
+
+  // ========================================================================
+  // === CÁC HÀM MỚI =======================================================
+  // ========================================================================
+
+  static Future<ApiResult<MySubscription>> getMySubscription() async {
+    final url = Uri.parse(_mySubscriptionUrl);
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+
+      final jsonResponse = jsonDecode(response.body);
+      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
+        return ApiResult(isSuccess: false, message: jsonResponse['message'] ?? 'Lỗi tải thông tin gói cước');
+      }
+
+      // API này trả về object trực tiếp trong `data`
+      return ApiResult.fromJson(
+        jsonResponse,
+        (dataJson) => MySubscription.fromJson(dataJson as Map<String, dynamic>),
+      );
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
+    }
+  }
+
+
+  static Future<ApiResult<List<PaymentMethod>>> getPaymentMethods() async {
+    final url = Uri.parse('$_paymentMethodsUrl?status=1');
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200 || !(jsonDecode(response.body)['isSuccess'] ?? false)) {
+        return ApiResult(isSuccess: false, message: jsonDecode(response.body)['message'] ?? 'Lỗi tải phương thức thanh toán');
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      final itemsList = jsonResponse['items'] as List<dynamic>?;
+      if (itemsList == null) {
+        return ApiResult(isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng (key items is null).');
+      }
+
+      final methods = itemsList.map((item) => PaymentMethod.fromJson(item as Map<String, dynamic>)).toList();
+      return ApiResult(isSuccess: true, data: methods);
+
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
+    }
+  }
+
+  static Future<ApiResult<SubscriptionRegistrationResponse>> registerSubscription({
+    required String planId,
+    required String paymentMethodId,
+  }) async {
+    final url = Uri.parse(_registerSubscriptionUrl);
+    final body = {
+      'subscriptionPlanId': planId,
+      'paymentMethodId': paymentMethodId,
+    };
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 20));
+
+      final jsonResponse = jsonDecode(response.body);
+
+      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
+          return ApiResult(
+            isSuccess: false,
+            message: jsonResponse['message'] as String?,
+            errors: (jsonResponse['errors'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+            errorCode: jsonResponse['errorCode'] as String?,
+          );
+      }
+
+      return ApiResult.fromJson(
+        jsonResponse,
+        (dataJson) => SubscriptionRegistrationResponse.fromJson(dataJson as Map<String, dynamic>),
+      );
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Lỗi đăng ký gói: ${e.toString()}');
+    }
+  }
+
+  static Future<ApiResult<List<SubscriptionPlan>>> getSubscriptionPlans({
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    final url = Uri.parse('$_plansUrl?page=$page&pageSize=$pageSize');
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(
+          const Duration(seconds: 15));
+
+      final jsonResponse = jsonDecode(response.body);
+
+      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
+         return ApiResult(isSuccess: false, message: jsonResponse['message'] ?? 'Lỗi tải các gói subscription');
+      }
+
+      final itemsList = jsonResponse['items'] as List<dynamic>?;
+      if (itemsList == null) {
+        return ApiResult(
+            isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng (key items is null).');
+      }
+
+      final plans = itemsList.map((planJson) =>
+          SubscriptionPlan.fromJson(planJson as Map<String, dynamic>)).toList();
+
+      return ApiResult(
+        isSuccess: true,
+        data: plans,
+      );
+    } on TimeoutException {
+      return ApiResult(
+          isSuccess: false,
+          message: 'Hết thời gian yêu cầu. Vui lòng thử lại.');
+    } on http.ClientException catch (e) {
+      return ApiResult(
+          isSuccess: false, message: 'Lỗi kết nối: ${e.message}');
+    } catch (e) {
+      return ApiResult(isSuccess: false,
+          message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
+    }
+  }
+
+
+  // ... (các hàm còn lại giữ nguyên) ...
+  Future<dynamic> createPodcast({
+    required String authToken,
+    required String title,
+    required String description,
+    required XFile thumbnailFile,
+    required String audioFilePath,
+    required String audioFileName,
+    required String seriesName,
+    required String guestName,
+    required int episodeNumber,
+    required int topicCategories,
+    required String hostName,
+    required int duration,
+    required int emotionCategories,
+    required String tags,
+    required String transcriptUrl,
+  }) async {
+    final url = Uri.parse(_createPodcastUrl);
+    final request = http.MultipartRequest('POST', url);
+
+    request.headers['Authorization'] = 'Bearer $authToken';
+
+    request.fields['Title'] = title;
+    request.fields['Description'] = description;
+    request.fields['SeriesName'] = seriesName;
+    request.fields['GuestName'] = guestName;
+    request.fields['EpisodeNumber'] = episodeNumber.toString();
+    request.fields['TopicCategories'] = topicCategories.toString();
+    request.fields['HostName'] = hostName;
+    request.fields['Duration'] = duration.toString();
+    request.fields['EmotionCategories'] = emotionCategories.toString();
+    request.fields['Tags'] = tags;
+    request.fields['TranscriptUrl'] = transcriptUrl;
+
+    request.files.add(await http.MultipartFile.fromPath(
+      'Thumbnail',
+      thumbnailFile.path,
+      contentType: MediaType('image', 'jpeg'),
+    ));
+
+    request.files.add(await http.MultipartFile.fromPath(
+      'AudioFile',
+      audioFilePath,
+      filename: audioFileName,
+      contentType: MediaType('audio', 'mpeg'),
+    ));
+
+    final response = await request.send();
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final responseBody = await response.stream.bytesToString();
+      return jsonDecode(responseBody);
+    } else {
+      throw Exception('Failed to create podcast: ${response.statusCode}');
+    }
   }
 
 
@@ -84,17 +281,16 @@ class ApiService {
     }
   }
 
-  // === THÊM HÀM MỚI ĐỂ VERIFY OTP ===
   static Future<ApiResult<dynamic>> verifyOtp({
-    required String contact, // email hoặc số điện thoại
+    required String contact,
     required String otpCode,
   }) async {
     final url = Uri.parse(_verifyOtpUrl);
     final body = {
       'contact': contact,
       'otpCode': otpCode,
-      'otpSentChannel': 1, // 1=Email
-      'otpType': 1, // 1=Registration
+      'otpSentChannel': 1,
+      'otpType': 1,
     };
 
     try {
@@ -105,7 +301,6 @@ class ApiService {
       ).timeout(const Duration(seconds: 10));
 
       final jsonResponse = jsonDecode(response.body);
-      // Giống như register, API này không trả về 'data' nên ta truyền vào hàm trả về null
       return ApiResult.fromJson(jsonResponse, (data) => null);
     } on TimeoutException {
       return ApiResult(isSuccess: false, message: 'Request timed out.');
@@ -138,7 +333,6 @@ class ApiService {
 
       final jsonResponse = jsonDecode(response.body);
 
-      // Bây giờ chúng ta sẽ parse cả trường 'data' bằng LoginData.fromJson
       return ApiResult.fromJson(
         jsonResponse,
             (dataJson) => LoginData.fromJson(dataJson as Map<String, dynamic>),
@@ -151,65 +345,6 @@ class ApiService {
     } catch (e) {
       return ApiResult(isSuccess: false,
           message: 'An unexpected error occurred: ${e.toString()}');
-    }
-  }
-
-  static Future<ApiResult<List<SubscriptionPlan>>> getSubscriptionPlans({
-    int page = 1,
-    int pageSize = 10,
-  }) async {
-    // Thêm các tham số page và pageSize vào URL
-    final url = Uri.parse('$_plansUrl?page=$page&pageSize=$pageSize');
-    try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(
-          const Duration(seconds: 15));
-
-      final jsonResponse = jsonDecode(response.body);
-
-      if (response.statusCode == 401) {
-        return ApiResult(isSuccess: false,
-            message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-      }
-
-      final isSuccess = jsonResponse['isSuccess'] as bool? ?? false;
-
-      if (!isSuccess) {
-        return ApiResult(
-          isSuccess: false,
-          message: jsonResponse['message'] as String? ?? 'API đã trả về lỗi.',
-          errors: (jsonResponse['errors'] as List<dynamic>?)?.map((e) =>
-              e.toString()).toList(),
-        );
-      }
-
-      // Trích xuất danh sách từ trường "items"
-      final itemsList = jsonResponse['items'] as List<dynamic>?;
-      if (itemsList == null) {
-        return ApiResult(
-            isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng.');
-      }
-
-      final plans = itemsList
-          .map((planJson) =>
-          SubscriptionPlan.fromJson(planJson as Map<String, dynamic>))
-          .toList();
-
-      return ApiResult(
-        isSuccess: true,
-        data: plans,
-        message: jsonResponse['message'] as String?,
-      );
-    } on TimeoutException {
-      return ApiResult(
-          isSuccess: false,
-          message: 'Hết thời gian yêu cầu. Vui lòng thử lại.');
-    } on http.ClientException catch (e) {
-      return ApiResult(
-          isSuccess: false, message: 'Lỗi kết nối: ${e.message}');
-    } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
     }
   }
 
@@ -226,11 +361,10 @@ class ApiService {
             isSuccess: false, message: 'Phiên đăng nhập đã hết hạn.');
       }
 
-      // Dùng ApiResult để parse, và UserProfile.fromJson sẽ tự xử lý trường 'data'
       return ApiResult.fromJson(
         jsonResponse,
             (dataJson) =>
-            UserProfile.fromJson(jsonResponse), // Truyền cả jsonResponse vào
+            UserProfile.fromJson(jsonResponse),
       );
     } catch (e) {
       return ApiResult(isSuccess: false,
@@ -238,78 +372,49 @@ class ApiService {
     }
   }
 
-  // --- SUBMIT CREATOR APPLICATION (Đã cập nhật xử lý lỗi) ---
   static Future<ApiResult<dynamic>> submitCreatorApplication(
       CreatorApplication application) async {
     final body = application.toJson();
-
     final url = Uri.parse(_creatorApplicationUrl);
     try {
-      final headers = await _getAuthHeaders(); // Sử dụng hàm lấy token mới
+      final headers = await _getAuthHeaders();
       final response = await http.post(
         url,
         headers: headers,
         body: jsonEncode(body),
       ).timeout(const Duration(seconds: 15));
 
-      // Xử lý thành công (200 OK)
-      if (response.statusCode == 200) {
-        // API trả về 200 OK, thường là JSON, nhưng cũng có thể là text/plain
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseBody = jsonDecode(response.body);
         return ApiResult(
           isSuccess: responseBody['success'] ?? true,
-          // Dựa vào trường 'success'
           message: responseBody['message'] ?? 'Gửi đơn thành công!',
           data: responseBody,
         );
-      }
-
-      // Xử lý lỗi (4xx, 5xx)
-
-      // Attempt to decode JSON for detailed messages
-      final errorBody = jsonDecode(response.body);
-      String errorMessage = 'Lỗi ${response
-          .statusCode}. Server không phản hồi.';
-
-      if (response.statusCode == 400) {
-        // Xử lý lỗi 400 Bad Request (Validation Errors)
+      } else {
+        final errorBody = jsonDecode(response.body);
+        String errorMessage = 'Lỗi ${response.statusCode}. Server không phản hồi.';
         if (errorBody['errors'] != null && errorBody['errors'] is Map) {
-          // Trích xuất tất cả lỗi xác thực thành một chuỗi
           final validationErrors = (errorBody['errors'] as Map).values
               .expand((list) => list as Iterable)
               .join('; ');
           errorMessage = 'Lỗi xác thực: $validationErrors';
-        } else if (errorBody['detail'] != null) {
-          errorMessage = 'Lỗi 400: ${errorBody['detail']}';
         }
-      } else if (response.statusCode == 401) {
-        // Xử lý lỗi 401 Unauthorized
-        errorMessage = 'Lỗi 401: Không được phép. Vui lòng đăng nhập lại.';
-      } else if (response.statusCode >= 500) {
-        // Xử lý lỗi 5xx Internal Server Error
-        errorMessage =
-        'Lỗi Server (${response.statusCode}): Vui lòng thử lại sau.';
+        return ApiResult(isSuccess: false, message: errorMessage);
       }
-
-      return ApiResult(isSuccess: false, message: errorMessage);
     } catch (e) {
-      // Lỗi kết nối, timeout, hoặc lỗi parse JSON
-      return ApiResult(isSuccess: false,
-          message: 'Đã xảy ra lỗi kết nối hoặc parse dữ liệu: ${e.toString()}');
+      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi kết nối: ${e.toString()}');
     }
   }
 
-  /// HÀM MỚI: Lấy trạng thái đơn đăng ký của user
   static Future<ApiResult<CreatorApplicationStatus>>
-  getMyCreatorApplicationStatus() async {
+      getMyCreatorApplicationStatus() async {
     final url = Uri.parse(_creatorStatusUrl);
     try {
       final headers = await _getAuthHeaders();
       final response =
-      await http.get(url, headers: headers).timeout(
-          const Duration(seconds: 15));
+          await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
 
-      // 404 Not Found nghĩa là user chưa nộp đơn
       if (response.statusCode == 404) {
         return ApiResult(
             isSuccess: false,
@@ -323,7 +428,6 @@ class ApiService {
 
       final jsonResponse = jsonDecode(response.body);
 
-      // 200 OK: User đã nộp đơn, trả về chi tiết
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return ApiResult(
           isSuccess: true,
@@ -338,11 +442,10 @@ class ApiService {
     }
   }
 
-  /// HÀM MỚI: Lấy danh sách bài đăng của creator
   static Future<ApiResult<List<MyPost>>> getMyPosts(
       {int page = 1, int pageSize = 20}) async {
     final url =
-    Uri.parse('$_creatorPodcastsUrl/my-podcasts?page=$page&pageSize=$pageSize');
+        Uri.parse('$_creatorPodcastsUrl/my-podcasts?page=$page&pageSize=$pageSize');
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(url, headers: headers);
@@ -350,12 +453,10 @@ class ApiService {
 
       if (response.statusCode != 200) {
         return ApiResult(
-            isSuccess: false, message: 'Lỗi ${response.statusCode}');
+            isSuccess: false, message: 'Lỗi ${response.statusCode}: ${jsonResponse['message']}');
       }
 
-      // Giả định API trả về có phân trang giống API plans
-      final itemsList = jsonResponse['podcasts'] as List<
-          dynamic>?; // Key có thể là 'items' hoặc 'podcasts'
+      final itemsList = jsonResponse['podcasts'] as List<dynamic>?;
       if (itemsList == null) {
         return ApiResult(
             isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng.');
@@ -367,6 +468,5 @@ class ApiService {
       return ApiResult(isSuccess: false, message: e.toString());
     }
   }
-
 
 }

@@ -80,7 +80,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
           final bool? didPost = await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const CreatePostcardScreen(),
+              builder: (context) => const PodcastUploadScreen(),
             ),
           );
           // Nếu người dùng đã đăng bài thành công, tải lại danh sách
@@ -122,4 +122,3 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
     );
   }
 }
-

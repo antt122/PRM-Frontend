@@ -8,6 +8,7 @@ import '../components/hero_section.dart';
 import '../components/mindfulness_highlights.dart';
 import '../components/community_section.dart';
 import '../components/pricing_section.dart';
+import '../components/app_drawer.dart'; // Import AppDrawer mới
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -30,15 +31,18 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
+      drawer: const AppDrawer(), // Thêm Drawer vào đây
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             backgroundColor: kBackgroundColor,
             elevation: 0,
             pinned: true,
-            leading: IconButton(
-              icon: const Icon(Icons.menu, color: kPrimaryTextColor),
-              onPressed: () {},
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu, color: kPrimaryTextColor),
+                onPressed: () => Scaffold.of(context).openDrawer(), // Mở drawer
+              ),
             ),
             title: const Text(
               'HEALINK',
