@@ -16,6 +16,22 @@ class HeroSection extends StatefulWidget {
 
 class _HeroSectionState extends State<HeroSection> {
   bool _isLoading = false;
+  CreatorApplicationStatus? _creatorStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCreatorStatus();
+  }
+
+  Future<void> _loadCreatorStatus() async {
+    final result = await ApiService.getMyCreatorApplicationStatus();
+    if (mounted && result.isSuccess && result.data != null) {
+      setState(() {
+        _creatorStatus = result.data;
+      });
+    }
+  }
 
   Future<void> _handleCreatorButtonTap() async {
     setState(() => _isLoading = true);
@@ -97,33 +113,86 @@ class _HeroSectionState extends State<HeroSection> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _handleCreatorButtonTap,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kAccentColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 30, vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                // Hiển thị thông báo đã là Creator hoặc nút đăng ký
+                if (_creatorStatus != null && _creatorStatus!.status.toLowerCase() == 'approved')
+                  _buildApprovedCreatorCard()
+                else
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _handleCreatorButtonTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kAccentColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 30, vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
                     ),
+                    child: _isLoading
+                        ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
+                        : const Text('Trở thành content creator'),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 3,
-                    ),
-                  )
-                      : const Text('Trở thành content creator'),
-                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildApprovedCreatorCard() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.95),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.verified, color: Colors.green, size: 22),
+              SizedBox(width: 8),
+              Text(
+                '🎉 Bạn đã là Content Creator',
+                style: TextStyle(
+                  color: kPrimaryTextColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CreatorDashboardScreen()),
+            );
+          },
+          icon: const Icon(Icons.dashboard, size: 18),
+          label: const Text('Quản lý Podcast của tôi'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kAccentColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

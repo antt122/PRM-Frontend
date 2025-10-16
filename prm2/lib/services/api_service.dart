@@ -15,6 +15,8 @@ import '../models/login_data.dart';
 import '../models/my_post.dart';
 import '../models/subscription_plan.dart';
 import '../models/user_profile.dart';
+import '../models/podcast.dart';
+import '../models/pagination_result.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ApiService {
@@ -38,6 +40,7 @@ class ApiService {
   static String get _creatorStatusUrl => '$_creatorApiUrl/CreatorApplications/my-status';
   static String get _creatorPodcastsUrl => '$_creatorApiUrl/creator/podcasts';
   static String get _createPodcastUrl => '$_creatorApiUrl/creator/podcasts';
+  static String get _userPodcastsUrl => '$_baseUrl/content/user/podcasts';
 
 // --- HÀM HELPER MỚI ĐỂ LẤY HEADER CÓ TOKEN ---
   static Future<Map<String, String>> _getAuthHeaders() async {
@@ -466,6 +469,269 @@ class ApiService {
       return ApiResult(isSuccess: true, data: posts);
     } catch (e) {
       return ApiResult(isSuccess: false, message: e.toString());
+    }
+  }
+
+  // ========================================================================
+  // === PODCAST APIs FOR USERS ============================================
+  // ========================================================================
+
+  /// Get published podcasts for listening (trending/latest/by category)
+  static Future<PaginationResult<Podcast>> getPodcasts({
+    int page = 1,
+    int pageSize = 10,
+    List<int>? emotionCategories,
+    List<int>? topicCategories,
+    String? searchTerm,
+    String? seriesName,
+  }) async {
+    final queryParams = {
+      'page': page.toString(),
+      'pageSize': pageSize.toString(),
+      if (emotionCategories != null && emotionCategories.isNotEmpty)
+        'emotionCategories': emotionCategories.join(','),
+      if (topicCategories != null && topicCategories.isNotEmpty)
+        'topicCategories': topicCategories.join(','),
+      if (searchTerm != null && searchTerm.isNotEmpty) 'searchTerm': searchTerm,
+      if (seriesName != null && seriesName.isNotEmpty) 'seriesName': seriesName,
+    };
+
+    final url = Uri.parse(_userPodcastsUrl).replace(queryParameters: queryParams);
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      return PaginationResult<Podcast>.fromJson(jsonResponse, Podcast.fromJson);
+    } catch (e) {
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
+        items: [],
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Get trending podcasts (most viewed)
+  static Future<PaginationResult<Podcast>> getTrendingPodcasts({
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    final url = Uri.parse('$_userPodcastsUrl/trending?page=$page&pageSize=$pageSize');
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      return PaginationResult<Podcast>.fromJson(jsonResponse, Podcast.fromJson);
+    } catch (e) {
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
+        items: [],
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Get latest podcasts
+  static Future<PaginationResult<Podcast>> getLatestPodcasts({
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    final url = Uri.parse('$_userPodcastsUrl/latest?page=$page&pageSize=$pageSize');
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      return PaginationResult<Podcast>.fromJson(jsonResponse, Podcast.fromJson);
+    } catch (e) {
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
+        items: [],
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Get podcast by ID
+  static Future<ApiResult<Podcast>> getPodcastById(String id) async {
+    final url = Uri.parse('$_userPodcastsUrl/$id');
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return ApiResult(isSuccess: false, message: 'Không tìm thấy podcast');
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      return ApiResult(isSuccess: true, data: Podcast.fromJson(jsonResponse));
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Lỗi: ${e.toString()}');
+    }
+  }
+
+  /// Search podcasts
+  static Future<PaginationResult<Podcast>> searchPodcasts({
+    required String keyword,
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    final url = Uri.parse('$_userPodcastsUrl/search?keyword=$keyword&page=$page&pageSize=$pageSize');
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      return PaginationResult<Podcast>.fromJson(jsonResponse, Podcast.fromJson);
+    } catch (e) {
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
+        items: [],
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Increment view count
+  static Future<void> incrementPodcastView(String podcastId) async {
+    final url = Uri.parse('$_userPodcastsUrl/$podcastId/view');
+    try {
+      final headers = await _getAuthHeaders();
+      await http.post(url, headers: headers).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      // Silent fail - không cần thông báo lỗi cho user
+    }
+  }
+
+  /// Toggle like podcast (like/unlike)
+  static Future<ApiResult<bool>> toggleLikePodcast(String podcastId) async {
+    final url = Uri.parse('$_userPodcastsUrl/$podcastId/like');
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(url, headers: headers).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return ApiResult<bool>(
+          isSuccess: true,
+          data: data['isLiked'] ?? true,
+          message: data['message'] ?? 'Success',
+        );
+      } else {
+        return ApiResult<bool>(
+          isSuccess: false,
+          message: 'Không thể thực hiện thao tác',
+        );
+      }
+    } catch (e) {
+      return ApiResult<bool>(
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Check if user liked a podcast
+  static Future<bool> checkPodcastLiked(String podcastId) async {
+    final url = Uri.parse('$_userPodcastsUrl/$podcastId/liked');
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['isLiked'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      return false;
     }
   }
 

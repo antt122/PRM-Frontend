@@ -6,6 +6,7 @@ import '../screens/my_subscription_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/creator_dashboard_screen.dart';
 import '../screens/creator_application_screen.dart';
+import '../screens/podcast_list_screen.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -136,6 +137,20 @@ class _AppDrawerState extends State<AppDrawer> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => const MySubscriptionScreen()),
+                  );
+                },
+              ),
+              
+              // ⚠️ NEW: "Khám phá Podcast"
+              ListTile(
+                leading: const Icon(Icons.headphones),
+                title: const Text('Khám phá Podcast'),
+                subtitle: const Text('Nghe podcast về sức khỏe tinh thần'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const PodcastListScreen()),
                   );
                 },
               ),
