@@ -157,6 +157,28 @@ class _AppDrawerState extends State<AppDrawer> {
               
               const Divider(),
               
+              // ⚠️ NEW: "Quản lý Podcast" - Show only for ContentCreators
+              if (_isContentCreator)
+                ListTile(
+                  leading: const Icon(Icons.dashboard, color: Color(0xFF8B6B3E)),
+                  title: const Text(
+                    'Quản lý Podcast',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text('Quản lý nội dung của bạn'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CreatorDashboardScreen(),
+                      ),
+                    );
+                  },
+                ),
+              
+              const Divider(),
+              
               // ⚠️ NEW: "Đăng ký gói cước" - Show if user doesn't have subscription
               if (!_hasSubscription)
                 ListTile(
@@ -169,23 +191,6 @@ class _AppDrawerState extends State<AppDrawer> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Vui lòng chọn gói từ phần Pricing trên trang chủ'),
-                      ),
-                    );
-                  },
-                ),
-              
-              // ⚠️ NEW: "Trang sáng tạo" - Show only for ContentCreators
-              if (_isContentCreator)
-                ListTile(
-                  leading: const Icon(Icons.create),
-                  title: const Text('Trang sáng tạo'),
-                  subtitle: const Text('Quản lý nội dung của bạn'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CreatorDashboardScreen(),
                       ),
                     );
                   },

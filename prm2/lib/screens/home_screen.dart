@@ -8,7 +8,7 @@ import '../components/hero_section.dart';
 import '../components/mindfulness_highlights.dart';
 import '../components/community_section.dart';
 import '../components/pricing_section.dart';
-import '../components/app_drawer.dart'; // Import AppDrawer mới
+import '../components/app_drawer_enhanced.dart'; // Import AppDrawer Enhanced với đầy đủ tính năng
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
