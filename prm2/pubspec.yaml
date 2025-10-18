@@ -20,6 +20,9 @@ dependencies:
   http: ^1.2.1
   url_launcher: ^6.3.0
   cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.5.1
+  timeago: ^3.6.1 # Để hiển thị "2 days ago"
+  audioplayers: ^6.0.0
 
 dev_dependencies:
   flutter_test:
