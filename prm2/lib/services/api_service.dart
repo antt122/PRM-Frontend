@@ -3,20 +3,21 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
-import 'package:prm2/models/my_subscription.dart';
-import 'package:prm2/models/payment_method.dart';
-import 'package:prm2/models/subscription_registration_response.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/CmsUser.dart';
+import '../models/CmsUserProfile.dart';
+import '../models/CreatePlanRequest.dart';
+import '../models/CreateUserResponse.dart';
+import '../models/LoginData.dart';
+import '../models/SubscriptionFilters.dart';
+import '../models/UpdatePlanRequest.dart';
+import '../models/UpdateUserResponse.dart';
+import '../models/UserDetail.dart';
 import '../models/api_result.dart';
-import '../models/creator_application.dart';
-import '../models/creator_application_status.dart';
-import '../models/login_data.dart';
-import '../models/my_post.dart';
-import '../models/subscription_plan.dart';
-import '../models/user_profile.dart';
-import 'package:image_picker/image_picker.dart';
-
+import '../models/Subscription.dart';
+import '../models/SubscriptionPlan.dart';
+import '../models/SubscriptionPlanFilters.dart';
+import '../models/UpdateSubscriptionRequest.dart';
 class ApiService {
   // --- CÁC URL ĐƯỢC CHUYỂN THÀNH GETTER ĐỂ TRÁNH RACE CONDITION ---
   static String get _baseUrl => dotenv.env['BASE_URL'] ?? '';
@@ -26,291 +27,35 @@ class ApiService {
   static String get _creatorApiUrl => '$_baseUrl';
   static String get _cmsUrl => '$_baseUrl/cms';
 
-  static String get _registerUrl => '$_authUrl/register';
-  static String get _verifyOtpUrl => '$_authUrl/verify-otp';
-  static String get _loginUrl => '$_authUrl/login';
-  static String get _plansUrl => '$_userUrl/subscription-plans';
-  static String get _paymentMethodsUrl => '$_userUrl/payment-methods';
-  static String get _registerSubscriptionUrl => '$_userUrl/subscriptions/register';
-  static String get _mySubscriptionUrl => '$_userUrl/subscriptions/me'; // <-- THÊM MỚI
-  static String get _checkoutUrl => '$_userUrl/profile';
-  static String get _creatorApplicationUrl => '$_creatorApiUrl/CreatorApplications';
-  static String get _creatorStatusUrl => '$_creatorApiUrl/CreatorApplications/my-status';
-  static String get _creatorPodcastsUrl => '$_creatorApiUrl/creator/podcasts';
-  static String get _createPodcastUrl => '$_creatorApiUrl/creator/podcasts';
+  static String get _loginUrl => '$_cmsUrl/auth/login';
+  static String get _createCmsUserUrl => '$_cmsUrl/users';
+  static String get _logoutUrl => '$_cmsUrl/logout';
+  static String get _getCmsUsersUrl =>'$_cmsUrl/users';
+  static String get _getCmsUserProfileUrl => '$_cmsUrl/users/profile';
+  static String get _cmsUsersUrlProfileDetail => '$_cmsUrl/users';
+  static String get _getUserSubscriptionsCms=> '$_cmsUrl/subscriptions';
+  static String get _getSubscriptionPlansCms => '$_cmsUrl/subscription-plans';
+  static String get _refreshTokenCms => '$_cmsUrl/auth/refresh-token';
+
+
+
 
 // --- HÀM HELPER MỚI ĐỂ LẤY HEADER CÓ TOKEN ---
   static Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken');
 
+    final headers = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',  // Bypass ngrok free tier browser warning
+      'User-Agent': 'Flutter-Client',  // Identify as non-browser for ngrok
+    };
+
     if (token != null) {
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
+      headers['Authorization'] = 'Bearer $token';
     }
-    return {'Content-Type': 'application/json'};
-  }
 
-  // ========================================================================
-  // === CÁC HÀM MỚI =======================================================
-  // ========================================================================
-
-  static Future<ApiResult<MySubscription>> getMySubscription() async {
-    final url = Uri.parse(_mySubscriptionUrl);
-    try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
-
-      final jsonResponse = jsonDecode(response.body);
-      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
-        return ApiResult(isSuccess: false, message: jsonResponse['message'] ?? 'Lỗi tải thông tin gói cước');
-      }
-
-      // API này trả về object trực tiếp trong `data`
-      return ApiResult.fromJson(
-        jsonResponse,
-        (dataJson) => MySubscription.fromJson(dataJson as Map<String, dynamic>),
-      );
-    } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
-    }
-  }
-
-
-  static Future<ApiResult<List<PaymentMethod>>> getPaymentMethods() async {
-    final url = Uri.parse('$_paymentMethodsUrl?status=1');
-    try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode != 200 || !(jsonDecode(response.body)['isSuccess'] ?? false)) {
-        return ApiResult(isSuccess: false, message: jsonDecode(response.body)['message'] ?? 'Lỗi tải phương thức thanh toán');
-      }
-
-      final jsonResponse = jsonDecode(response.body);
-      final itemsList = jsonResponse['items'] as List<dynamic>?;
-      if (itemsList == null) {
-        return ApiResult(isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng (key items is null).');
-      }
-
-      final methods = itemsList.map((item) => PaymentMethod.fromJson(item as Map<String, dynamic>)).toList();
-      return ApiResult(isSuccess: true, data: methods);
-
-    } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
-    }
-  }
-
-  static Future<ApiResult<SubscriptionRegistrationResponse>> registerSubscription({
-    required String planId,
-    required String paymentMethodId,
-  }) async {
-    final url = Uri.parse(_registerSubscriptionUrl);
-    final body = {
-      'subscriptionPlanId': planId,
-      'paymentMethodId': paymentMethodId,
-    };
-
-    try {
-      final headers = await _getAuthHeaders();
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 20));
-
-      final jsonResponse = jsonDecode(response.body);
-
-      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
-          return ApiResult(
-            isSuccess: false,
-            message: jsonResponse['message'] as String?,
-            errors: (jsonResponse['errors'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
-            errorCode: jsonResponse['errorCode'] as String?,
-          );
-      }
-
-      return ApiResult.fromJson(
-        jsonResponse,
-        (dataJson) => SubscriptionRegistrationResponse.fromJson(dataJson as Map<String, dynamic>),
-      );
-    } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Lỗi đăng ký gói: ${e.toString()}');
-    }
-  }
-
-  static Future<ApiResult<List<SubscriptionPlan>>> getSubscriptionPlans({
-    int page = 1,
-    int pageSize = 10,
-  }) async {
-    final url = Uri.parse('$_plansUrl?page=$page&pageSize=$pageSize');
-    try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(
-          const Duration(seconds: 15));
-
-      final jsonResponse = jsonDecode(response.body);
-
-      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
-         return ApiResult(isSuccess: false, message: jsonResponse['message'] ?? 'Lỗi tải các gói subscription');
-      }
-
-      final itemsList = jsonResponse['items'] as List<dynamic>?;
-      if (itemsList == null) {
-        return ApiResult(
-            isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng (key items is null).');
-      }
-
-      final plans = itemsList.map((planJson) =>
-          SubscriptionPlan.fromJson(planJson as Map<String, dynamic>)).toList();
-
-      return ApiResult(
-        isSuccess: true,
-        data: plans,
-      );
-    } on TimeoutException {
-      return ApiResult(
-          isSuccess: false,
-          message: 'Hết thời gian yêu cầu. Vui lòng thử lại.');
-    } on http.ClientException catch (e) {
-      return ApiResult(
-          isSuccess: false, message: 'Lỗi kết nối: ${e.message}');
-    } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
-    }
-  }
-
-
-  // ... (các hàm còn lại giữ nguyên) ...
-  Future<dynamic> createPodcast({
-    required String authToken,
-    required String title,
-    required String description,
-    required XFile thumbnailFile,
-    required String audioFilePath,
-    required String audioFileName,
-    required String seriesName,
-    required String guestName,
-    required int episodeNumber,
-    required int topicCategories,
-    required String hostName,
-    required int duration,
-    required int emotionCategories,
-    required String tags,
-    required String transcriptUrl,
-  }) async {
-    final url = Uri.parse(_createPodcastUrl);
-    final request = http.MultipartRequest('POST', url);
-
-    request.headers['Authorization'] = 'Bearer $authToken';
-
-    request.fields['Title'] = title;
-    request.fields['Description'] = description;
-    request.fields['SeriesName'] = seriesName;
-    request.fields['GuestName'] = guestName;
-    request.fields['EpisodeNumber'] = episodeNumber.toString();
-    request.fields['TopicCategories'] = topicCategories.toString();
-    request.fields['HostName'] = hostName;
-    request.fields['Duration'] = duration.toString();
-    request.fields['EmotionCategories'] = emotionCategories.toString();
-    request.fields['Tags'] = tags;
-    request.fields['TranscriptUrl'] = transcriptUrl;
-
-    request.files.add(await http.MultipartFile.fromPath(
-      'Thumbnail',
-      thumbnailFile.path,
-      contentType: MediaType('image', 'jpeg'),
-    ));
-
-    request.files.add(await http.MultipartFile.fromPath(
-      'AudioFile',
-      audioFilePath,
-      filename: audioFileName,
-      contentType: MediaType('audio', 'mpeg'),
-    ));
-
-    final response = await request.send();
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final responseBody = await response.stream.bytesToString();
-      return jsonDecode(responseBody);
-    } else {
-      throw Exception('Failed to create podcast: ${response.statusCode}');
-    }
-  }
-
-
-  static Future<ApiResult<dynamic>> register({
-    required String email,
-    required String password,
-    required String confirmPassword,
-    required String fullName,
-    required String phoneNumber,
-  }) async {
-    final url = Uri.parse(_registerUrl);
-    final body = {
-      'email': email,
-      'password': password,
-      'confirmPassword': confirmPassword,
-      'fullName': fullName,
-      'phoneNumber': phoneNumber,
-      'otpSentChannel': 1
-    };
-
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
-
-      final jsonResponse = jsonDecode(response.body);
-      return ApiResult.fromJson(jsonResponse, (data) => null);
-    } on TimeoutException {
-      return ApiResult(
-          isSuccess: false, errors: ['Request timed out. Please try again.']);
-    } on http.ClientException catch (e) {
-      return ApiResult(
-          isSuccess: false, errors: ['Connection error: ${e.message}']);
-    } catch (e) {
-      return ApiResult(isSuccess: false,
-          errors: ['An unexpected error occurred: ${e.toString()}']);
-    }
-  }
-
-  static Future<ApiResult<dynamic>> verifyOtp({
-    required String contact,
-    required String otpCode,
-  }) async {
-    final url = Uri.parse(_verifyOtpUrl);
-    final body = {
-      'contact': contact,
-      'otpCode': otpCode,
-      'otpSentChannel': 1,
-      'otpType': 1,
-    };
-
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
-
-      final jsonResponse = jsonDecode(response.body);
-      return ApiResult.fromJson(jsonResponse, (data) => null);
-    } on TimeoutException {
-      return ApiResult(isSuccess: false, message: 'Request timed out.');
-    } on http.ClientException catch (e) {
-      return ApiResult(
-          isSuccess: false, message: 'Connection error: ${e.message}');
-    } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'An unexpected error occurred: ${e.toString()}');
-    }
+    return headers;
   }
 
   static Future<ApiResult<LoginData>> login({
@@ -323,7 +68,6 @@ class ApiService {
       'password': password,
       'grantType': 0,
     };
-
     try {
       final response = await http.post(
         url,
@@ -348,125 +92,497 @@ class ApiService {
     }
   }
 
-  static Future<ApiResult<UserProfile>> getUserProfile() async {
-    final url = Uri.parse(_checkoutUrl);
-    try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(
-          const Duration(seconds: 15));
-      final jsonResponse = jsonDecode(response.body);
 
-      if (response.statusCode == 401) {
-        return ApiResult(
-            isSuccess: false, message: 'Phiên đăng nhập đã hết hạn.');
-      }
+  Future<ApiResult<CreateUserResponse>> createUser({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phoneNumber,
+    required String address,
+    required int role, // 0: User, 1: Creator, etc.
+  }) async {
+    final url = Uri.parse(_createCmsUserUrl);
+    final body = {
+      'email': email,
+      'password': password,
+      'fullName': fullName,
+      'phoneNumber': phoneNumber,
+      'address': address,
+      'role': role,
+    };
 
-      return ApiResult.fromJson(
-        jsonResponse,
-            (dataJson) =>
-            UserProfile.fromJson(jsonResponse),
-      );
-    } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'Lỗi lấy thông tin người dùng: ${e.toString()}');
-    }
-  }
-
-  static Future<ApiResult<dynamic>> submitCreatorApplication(
-      CreatorApplication application) async {
-    final body = application.toJson();
-    final url = Uri.parse(_creatorApplicationUrl);
     try {
       final headers = await _getAuthHeaders();
       final response = await http.post(
         url,
         headers: headers,
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 15));
+      );
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final responseBody = jsonDecode(response.body);
+      final jsonResponse = jsonDecode(response.body);
+
+      return ApiResult.fromJson(
+        jsonResponse,
+            (data) => CreateUserResponse.fromJson(data as Map<String, dynamic>),
+      );
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+    }
+  }
+
+
+  Future<ApiResult<dynamic>> logout() async {
+    final url = Uri.parse(_logoutUrl);
+    try {
+      final headers = await _getAuthHeaders();
+      // API logout chỉ cần gọi POST mà không cần body
+      final response = await http.post(
+        url,
+        headers: headers,
+      );
+
+      final jsonResponse = jsonDecode(response.body);
+      // API này không trả về 'data' nên ta truyền vào hàm parse là null
+      return ApiResult.fromJson(jsonResponse, (data) => null);
+    } catch (e) {
+      // Ngay cả khi API lỗi, chúng ta vẫn nên coi như đăng xuất thành công ở phía client
+      return ApiResult(isSuccess: true, message: 'Đã xảy ra lỗi phía server, nhưng client sẽ đăng xuất.');
+    }
+  }
+
+
+  Future<ApiResult<PaginatedResult<CmsUser>>> getUsers({
+    int page = 1,
+    int pageSize = 10,
+    String? search,
+    String sortBy = 'createdAt',
+    bool isAscending = false,
+    int? status, // Thêm tham số status
+  }) async {
+    final queryParams = {
+      'page': page.toString(),
+      'pageSize': pageSize.toString(),
+      'sortBy': sortBy,
+      'isAscending': isAscending.toString(),
+      if (search != null && search.isNotEmpty) 'search': search,
+      if (status != null) 'status': status.toString(), // Thêm status vào query
+    };
+    final uri = Uri.parse(_getCmsUsersUrl).replace(queryParameters: queryParams);
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+      final jsonResponse = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        // Trường hợp thành công
+        final paginatedData = PaginatedResult.fromJson(jsonResponse, (userJson) => CmsUser.fromJson(userJson));
+        return ApiResult(isSuccess: true, data: paginatedData);
+      } else {
+        // SỬA LỖI: Trường hợp thất bại, tạo đối tượng ApiResult trực tiếp
         return ApiResult(
-          isSuccess: responseBody['success'] ?? true,
-          message: responseBody['message'] ?? 'Gửi đơn thành công!',
-          data: responseBody,
+          isSuccess: jsonResponse['isSuccess'] ?? false,
+          message: jsonResponse['message'],
+          errors: (jsonResponse['errors'] as List<dynamic>?)?.cast<String>(),
+          errorCode: jsonResponse['errorCode'],
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+    }
+  }
+
+  Future<ApiResult<CmsUserProfile>> getCmsUserProfile() async {
+    final uri = Uri.parse(_getCmsUserProfileUrl);
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+      final jsonResponse = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        return ApiResult.fromJson(jsonResponse, (data) => CmsUserProfile.fromJson(data as Map<String, dynamic>));
+      } else {
+        return ApiResult(
+          isSuccess: jsonResponse['isSuccess'] ?? false,
+          message: jsonResponse['message'],
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+    }
+  }
+
+  Future<ApiResult<UserDetail>> getUserDetails(String userId) async {
+    final uri = Uri.parse('$_cmsUsersUrlProfileDetail/$userId');
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+      final jsonResponse = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        return ApiResult.fromJson(
+            jsonResponse, (data) => UserDetail.fromJson(data as Map<String, dynamic>));
+      } else {
+        return ApiResult(
+          isSuccess: jsonResponse['isSuccess'] ?? false,
+          message: jsonResponse['message'],
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+    }
+  }
+
+  Future<ApiResult<UpdateUserResponse>> updateUserInfo({
+    required String userId,
+    required String fullName,
+    required String email,
+    required String? phoneNumber,
+    required String? address,
+  }) async {
+    final uri = Uri.parse('$_createCmsUserUrl/$userId');
+    final body = jsonEncode({
+      'fullName': fullName,
+      'email': email,
+      'phoneNumber': phoneNumber,
+      'address': address,
+    });
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.put(uri, headers: headers, body: body);
+      final jsonResponse = jsonDecode(response.body);
+      return ApiResult.fromJson(jsonResponse, (data) => UpdateUserResponse.fromJson(data as Map<String, dynamic>));
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+    }
+  }
+
+  // --- HÀM 2: CẬP NHẬT VAI TRÒ (ĐÃ SỬA LỖI) ---
+  Future<ApiResult<dynamic>> updateUserRoles({
+    required String userId,
+    required List<int> rolesToAdd,
+    required List<int> rolesToRemove,
+  }) async {
+    final uri = Uri.parse('$_createCmsUserUrl/$userId/roles');
+    final body = jsonEncode({
+      'rolesToAdd': rolesToAdd,
+      'rolesToRemove': rolesToRemove,
+    });
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.put(uri, headers: headers, body: body);
+      final jsonResponse = jsonDecode(response.body);
+      // SỬA LỖI: Tạo đối tượng ApiResult trực tiếp để tránh lỗi type generic
+      return ApiResult(
+        isSuccess: jsonResponse['isSuccess'] ?? false,
+        message: jsonResponse['message'],
+        errors: (jsonResponse['errors'] as List<dynamic>?)?.cast<String>(),
+      );
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+    }
+  }
+
+  // --- HÀM 3: CẬP NHẬT TRẠNG THÁI (ĐÃ SỬA LỖI) ---
+  Future<ApiResult<dynamic>> updateUserStatus({
+    required String userId,
+    required int status,
+    required String? reason,
+  }) async {
+    final uri = Uri.parse('$_createCmsUserUrl/$userId/status');
+    final body = jsonEncode({
+      'status': status,
+      'reason': reason,
+    });
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.put(uri, headers: headers, body: body);
+      final jsonResponse = jsonDecode(response.body);
+      // SỬA LỖI: Tạo đối tượng ApiResult trực tiếp
+      return ApiResult(
+        isSuccess: jsonResponse['isSuccess'] ?? false,
+        message: jsonResponse['message'],
+        errors: (jsonResponse['errors'] as List<dynamic>?)?.cast<String>(),
+      );
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+    }
+  }
+
+  Future<ApiResult<PaginatedResult<Subscription>>> getSubscriptions(
+      SubscriptionFilters filters,
+      ) async {
+    final queryParams = filters.toQueryParameters();
+    final uri = Uri.parse(_getUserSubscriptionsCms).replace(queryParameters: queryParams);
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 20));
+      final jsonResponse = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        final paginatedData = PaginatedResult.fromJson(
+          jsonResponse,
+              (itemJson) => Subscription.fromJson(itemJson as Map<String, dynamic>),
+        );
+        return ApiResult(isSuccess: true, data: paginatedData);
+      } else {
+        return ApiResult(
+          isSuccess: jsonResponse['isSuccess'] ?? false,
+          message: jsonResponse['message'],
+          errorCode: jsonResponse['errorCode'],
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: "Đã xảy ra lỗi: ${e.toString()}");
+    }
+  }
+
+  Future<ApiResult<Subscription>> getSubscriptionById(String subscriptionId) async {
+    // URL sẽ có dạng /api/cms/subscriptions/your-id-here
+    final uri = Uri.parse('$_getUserSubscriptionsCms/$subscriptionId');
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+      final jsonResponse = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        // API trả về một object 'data', không phải 'items' như trong danh sách
+        final subscription = Subscription.fromJson(jsonResponse['data']);
+        return ApiResult(isSuccess: true, data: subscription);
+      } else {
+        // Xử lý các lỗi như 404 Not Found
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi không xác định',
+          errorCode: jsonResponse['errorCode'],
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: "Lỗi kết nối: ${e.toString()}");
+    }
+  }
+
+  Future<ApiResult<PaginatedResult<SubscriptionPlan>>> getSubscriptionPlans(
+      SubscriptionPlanFilters filters,
+      ) async {
+    final queryParams = filters.toQueryParameters();
+    final uri = Uri.parse(_getSubscriptionPlansCms).replace(queryParameters: queryParams);
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+      final jsonResponse = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        final paginatedData = PaginatedResult.fromJson(
+          jsonResponse,
+              (itemJson) => SubscriptionPlan.fromJson(itemJson as Map<String, dynamic>),
+        );
+        return ApiResult(isSuccess: true, data: paginatedData);
+      } else {
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi không xác định',
+          errorCode: jsonResponse['errorCode'],
+        );      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: "Đã xảy ra lỗi: ${e.toString()}");
+    }
+  }
+
+  Future<ApiResult<Subscription>> updateSubscription(
+      String subscriptionId,
+      UpdateSubscriptionRequest requestData,
+      ) async {
+    // Sử dụng _getSubscriptionsUrl cho nhất quán
+    final uri = Uri.parse('$_getUserSubscriptionsCms/$subscriptionId');
+    try {
+      // --- SỬA LỖI 3: Lấy header có token xác thực ---
+      final headers = await _getAuthHeaders();
+      final response = await http.put(
+        uri,
+        headers: headers, // Sử dụng header đã lấy
+        body: json.encode(requestData.toJson()),
+      );
+
+      final jsonResponse = json.decode(response.body);
+
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        return ApiResult.fromJson(
+          jsonResponse,
+          // --- SỬA LỖI 1: Thêm ép kiểu (cast) ---
+              (data) => Subscription.fromJson(data as Map<String, dynamic>),
         );
       } else {
-        final errorBody = jsonDecode(response.body);
-        String errorMessage = 'Lỗi ${response.statusCode}. Server không phản hồi.';
-        if (errorBody['errors'] != null && errorBody['errors'] is Map) {
-          final validationErrors = (errorBody['errors'] as Map).values
-              .expand((list) => list as Iterable)
-              .join('; ');
-          errorMessage = 'Lỗi xác thực: $validationErrors';
-        }
-        return ApiResult(isSuccess: false, message: errorMessage);
-      }
-    } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi kết nối: ${e.toString()}');
-    }
-  }
-
-  static Future<ApiResult<CreatorApplicationStatus>>
-      getMyCreatorApplicationStatus() async {
-    final url = Uri.parse(_creatorStatusUrl);
-    try {
-      final headers = await _getAuthHeaders();
-      final response =
-          await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 404) {
-        return ApiResult(
-            isSuccess: false,
-            message: 'Bạn chưa nộp đơn đăng ký.',
-            errorCode: '404');
-      }
-      if (response.statusCode == 401) {
-        return ApiResult(
-            isSuccess: false, message: 'Phiên đăng nhập đã hết hạn.');
-      }
-
-      final jsonResponse = jsonDecode(response.body);
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return ApiResult(
-          isSuccess: true,
-          data: CreatorApplicationStatus.fromJson(jsonResponse),
+        // --- SỬA LỖI 2: Tạo đối tượng ApiResult trực tiếp để đúng kiểu trả về ---
+        return ApiResult<Subscription>(
+          isSuccess: jsonResponse['isSuccess'] ?? false,
+          message: jsonResponse['message'] ?? 'Đã xảy ra lỗi không xác định',
+          errorCode: jsonResponse['errorCode']?.toString(),
+          data: null, // Dữ liệu là null khi thất bại
         );
       }
-
-      return ApiResult(
-          isSuccess: false, message: 'Lỗi không xác định khi lấy trạng thái.');
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Lỗi: ${e.toString()}');
+      return ApiResult<Subscription>(
+        isSuccess: false,
+        message: 'Lỗi kết nối: ${e.toString()}',
+        data: null,
+      );
     }
   }
 
-  static Future<ApiResult<List<MyPost>>> getMyPosts(
-      {int page = 1, int pageSize = 20}) async {
-    final url =
-        Uri.parse('$_creatorPodcastsUrl/my-podcasts?page=$page&pageSize=$pageSize');
+  Future<ApiResult<Subscription>> cancelSubscription({
+    required String subscriptionId,
+    required bool cancelAtPeriodEnd,
+    String? reason,
+  }) async {
+    // URL sẽ có dạng /api/cms/subscriptions/{id}/cancel
+    final uri = Uri.parse('$_getUserSubscriptionsCms/$subscriptionId/cancel').replace(
+      queryParameters: {
+        'cancelAtPeriodEnd': cancelAtPeriodEnd.toString(),
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      },
+    );
+
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers);
+      // API này dùng phương thức POST và không có body
+      final response = await http.post(uri, headers: headers);
       final jsonResponse = jsonDecode(response.body);
 
-      if (response.statusCode != 200) {
-        return ApiResult(
-            isSuccess: false, message: 'Lỗi ${response.statusCode}: ${jsonResponse['message']}');
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        return ApiResult.fromJson(
+          jsonResponse,
+              (data) => Subscription.fromJson(data as Map<String, dynamic>),
+        );
+      } else {
+        return ApiResult<Subscription>(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi không xác định',
+          errorCode: jsonResponse['errorCode']?.toString(),
+        );
       }
-
-      final itemsList = jsonResponse['podcasts'] as List<dynamic>?;
-      if (itemsList == null) {
-        return ApiResult(
-            isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng.');
-      }
-
-      final posts = itemsList.map((p) => MyPost.fromJson(p)).toList();
-      return ApiResult(isSuccess: true, data: posts);
     } catch (e) {
-      return ApiResult(isSuccess: false, message: e.toString());
+      return ApiResult(isSuccess: false, message: "Lỗi kết nối: ${e.toString()}");
     }
   }
 
+  // --- HÀM MỚI ĐỂ TẠO SUBSCRIPTION PLAN ---
+  Future<ApiResult<SubscriptionPlan>> createSubscriptionPlan(
+      CreatePlanRequest requestData,
+      ) async {
+    final uri = Uri.parse(_getSubscriptionPlansCms);
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        uri,
+        headers: headers,
+        body: json.encode(requestData.toJson()),
+      );
+
+      final jsonResponse = json.decode(response.body);
+
+      if (response.statusCode == 201 && jsonResponse['isSuccess'] == true) {
+        return ApiResult.fromJson(
+          jsonResponse,
+              (data) => SubscriptionPlan.fromJson(data as Map<String, dynamic>),
+        );
+      } else {
+        // Xử lý lỗi validation hoặc conflict
+        return ApiResult<SubscriptionPlan>(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Đã xảy ra lỗi',
+          // API của bạn trả về 'errors' là một object, không phải list string
+          // Bạn có thể xử lý nó chi tiết hơn nếu cần
+          errors: jsonResponse['errors'] != null ? [jsonEncode(jsonResponse['errors'])] : null,
+          errorCode: jsonResponse['statusCode']?.toString(),
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: "Lỗi kết nối: ${e.toString()}");
+    }
+  }
+
+  Future<ApiResult<SubscriptionPlan>> getSubscriptionPlanById(String planId) async {
+    final uri = Uri.parse('$_getSubscriptionPlansCms/$planId');
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+      final jsonResponse = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        // API trả về một object 'data'
+        final plan = SubscriptionPlan.fromJson(jsonResponse['data'] as Map<String, dynamic>);
+        return ApiResult(isSuccess: true, data: plan);
+      } else {
+        return ApiResult<SubscriptionPlan>(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi không xác định',
+          errorCode: jsonResponse['statusCode']?.toString(),
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: "Lỗi kết nối: ${e.toString()}");
+    }
+
+  }
+  Future<ApiResult<SubscriptionPlan>> updateSubscriptionPlan(
+      String planId,
+      UpdatePlanRequest requestData,
+      ) async {
+    final uri = Uri.parse('$_getSubscriptionPlansCms/$planId');
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.put(
+        uri,
+        headers: headers,
+        body: json.encode(requestData.toJson()),
+      );
+
+      final jsonResponse = json.decode(response.body);
+
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        return ApiResult.fromJson(
+          jsonResponse,
+              (data) => SubscriptionPlan.fromJson(data as Map<String, dynamic>),
+        );
+      } else {
+        return ApiResult<SubscriptionPlan>(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Đã xảy ra lỗi',
+          errors: jsonResponse['errors'] != null ? [jsonEncode(jsonResponse['errors'])] : null,
+          errorCode: jsonResponse['statusCode']?.toString(),
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: "Lỗi kết nối: ${e.toString()}");
+    }
+  }
+  Future<ApiResult<dynamic>> deleteSubscriptionPlan(String planId) async {
+    final uri = Uri.parse('$_getSubscriptionPlansCms/$planId');
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.delete(uri, headers: headers);
+      final jsonResponse = jsonDecode(response.body);
+
+      // API xóa thành công thường trả về data là null
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
+        return ApiResult.fromJson(jsonResponse, (data) => null);
+      } else {
+        // Xử lý các lỗi như 400, 404
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi không xác định',
+          errorCode: jsonResponse['statusCode']?.toString(),
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: "Lỗi kết nối: ${e.toString()}");
+    }
+  }
+// ... (các hàm khác)
 }

@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:prm2/screens/LoginScreen.dart';
 import 'screens/splash_screen.dart'; // Import màn hình Splash mới
 
 Future<void> main() async {
@@ -26,7 +27,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // Màn hình bắt đầu bây giờ là SplashScreen
-      home: const SplashScreen(),
+      home: const LoginScreen(),
     );
   }
 }
