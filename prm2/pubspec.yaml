@@ -19,8 +19,18 @@ dependencies:
   http_parser: ^4.0.2
   http: ^1.2.1
   url_launcher: ^6.3.0
-  audioplayers: ^6.1.0
   cupertino_icons: ^1.0.8
+  # Audio playback with background support
+  just_audio: ^0.9.40
+  just_audio_background: ^0.0.1-beta.13
+  audio_service: ^0.18.15
+  # Image caching
+  cached_network_image: ^3.4.1
+  # File caching (for audio persistence)
+  flutter_cache_manager: ^3.4.1
+  path_provider: ^2.1.4
+  # State management
+  provider: ^6.1.2
 
 dev_dependencies:
   flutter_test:

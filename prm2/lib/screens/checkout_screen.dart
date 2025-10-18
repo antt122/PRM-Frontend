@@ -7,6 +7,7 @@ import '../models/api_result.dart';
 import '../models/subscription_plan.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
+import '../widgets/layout_with_mini_player.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final SubscriptionPlan plan;
@@ -72,7 +73,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return LayoutWithMiniPlayer(
       backgroundColor: kBackgroundColor,
       appBar: AppBar(
         title: const Text('Xác nhận đăng ký', style: TextStyle(color: kPrimaryTextColor)),
@@ -80,23 +81,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: kPrimaryTextColor),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildPlanSummary(),
-            const SizedBox(height: 32),
-            const Text(
-              'Chọn phương thức thanh toán',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kPrimaryTextColor),
+      child: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildPlanSummary(),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Chọn phương thức thanh toán',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kPrimaryTextColor),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildPaymentMethodsList(),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            _buildPaymentMethodsList(),
-          ],
-        ),
+          ),
+          _buildConfirmButton(),
+        ],
       ),
-      bottomNavigationBar: _buildConfirmButton(),
     );
   }
 

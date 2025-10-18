@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:prm2/models/my_subscription.dart';
 import '../models/api_result.dart';
 import '../services/api_service.dart';
+import '../widgets/layout_with_mini_player.dart';
 
 class MySubscriptionScreen extends StatefulWidget {
   const MySubscriptionScreen({super.key});
@@ -22,11 +23,11 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return LayoutWithMiniPlayer(
       appBar: AppBar(
         title: const Text('Gói cước của tôi'),
       ),
-      body: FutureBuilder<ApiResult<MySubscription>>(
+      child: FutureBuilder<ApiResult<MySubscription>>(
         future: _subscriptionFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {

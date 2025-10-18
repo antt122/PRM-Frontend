@@ -5,6 +5,7 @@ import '../models/creator_application.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../components/custom_text_field.dart';
+import '../widgets/layout_with_mini_player.dart';
 
 class CreatorApplicationScreen extends StatefulWidget {
   const CreatorApplicationScreen({super.key});
@@ -98,7 +99,7 @@ class _CreatorApplicationScreenState extends State<CreatorApplicationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return LayoutWithMiniPlayer(
       backgroundColor: kBackgroundColor,
       appBar: AppBar(
         title: const Text('Trở thành Creator',
@@ -107,7 +108,7 @@ class _CreatorApplicationScreenState extends State<CreatorApplicationScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: kPrimaryTextColor),
       ),
-      body: SingleChildScrollView(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
         child: Form(
           key: _formKey,

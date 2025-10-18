@@ -7,6 +7,7 @@ import '../screens/profile_screen.dart';
 import '../screens/creator_dashboard_screen.dart';
 import '../screens/creator_application_screen.dart';
 import '../screens/podcast_list_screen.dart';
+import '../services/api_service.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -20,6 +21,7 @@ class _AppDrawerState extends State<AppDrawer> {
   bool _hasSubscription = false;
   bool _isLoading = true;
   String _userName = 'User';
+  String _userEmail = '';
 
   @override
   void initState() {
@@ -27,28 +29,43 @@ class _AppDrawerState extends State<AppDrawer> {
     _loadUserInfo();
   }
 
-  // Load user info from SharedPreferences
+  // Load user info from API
   Future<void> _loadUserInfo() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      // Check user roles (assuming roles are stored as JSON array or comma-separated string)
-      final rolesString = prefs.getString('userRoles') ?? '';
-      final roles = rolesString.split(',').map((r) => r.trim()).toList();
-      
-      // Get user name
-      final name = prefs.getString('userName') ?? 'User';
-      
-      // Check subscription status (you can call API here if needed)
-      final hasSubscription = prefs.getBool('hasActiveSubscription') ?? false;
-      
+      // 1. Load user profile từ API
+      final profileResult = await ApiService.getUserProfile();
+      if (profileResult.isSuccess && profileResult.data != null) {
+        final profile = profileResult.data!;
+        setState(() {
+          _userName = profile.fullName;
+          _userEmail = profile.email;
+        });
+      }
+
+      // 2. Check creator status từ API
+      final creatorResult = await ApiService.getMyCreatorApplicationStatus();
+      if (creatorResult.isSuccess && creatorResult.data != null) {
+        final status = creatorResult.data!.status.toLowerCase();
+        setState(() {
+          _isContentCreator = (status == 'approved');
+        });
+      }
+
+      // 3. Check subscription status từ API
+      final subscriptionResult = await ApiService.getMySubscription();
+      if (subscriptionResult.isSuccess && subscriptionResult.data != null) {
+        final subscription = subscriptionResult.data!;
+        // Check if subscription is active
+        setState(() {
+          _hasSubscription = subscription.subscriptionStatusName.toLowerCase() == 'active';
+        });
+      }
+
       setState(() {
-        _isContentCreator = roles.contains('ContentCreator');
-        _hasSubscription = hasSubscription;
-        _userName = name;
         _isLoading = false;
       });
     } catch (e) {
+      // Nếu có lỗi, vẫn hiển thị drawer với giá trị mặc định
       setState(() {
         _isLoading = false;
       });
@@ -89,9 +106,25 @@ class _AppDrawerState extends State<AppDrawer> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                accountEmail: Text(
-                  _isContentCreator ? 'Content Creator ⭐' : 'User',
-                  style: const TextStyle(fontSize: 14),
+                accountEmail: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_userEmail.isNotEmpty)
+                      Text(
+                        _userEmail,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    if (_isContentCreator)
+                      const Text(
+                        'Content Creator ⭐',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber,
+                        ),
+                      ),
+                  ],
                 ),
                 currentAccountPicture: CircleAvatar(
                   backgroundColor: Colors.white,

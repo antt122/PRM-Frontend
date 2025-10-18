@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:prm2/models/user_profile.dart';
 import '../services/api_service.dart';
+import '../widgets/layout_with_mini_player.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -28,11 +29,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return LayoutWithMiniPlayer(
       appBar: AppBar(
         title: const Text('Thông tin cá nhân'),
       ),
-      body: FutureBuilder<UserProfile?>(
+      child: FutureBuilder<UserProfile?>(
         future: _profileFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {

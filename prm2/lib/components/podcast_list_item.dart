@@ -33,7 +33,8 @@ class PodcastListItem extends StatelessWidget {
                     ? Image.network(
                         podcast.thumbnailUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildPlaceholder(),
                       )
                     : _buildPlaceholder(),
               ),
@@ -52,6 +53,7 @@ class PodcastListItem extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -63,25 +65,45 @@ class PodcastListItem extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey.shade600,
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   const SizedBox(height: 8),
                   // Stats row
                   Row(
                     children: [
-                      Icon(Icons.play_circle_outline, size: 14, color: Colors.grey.shade600),
+                      Icon(
+                        Icons.play_circle_outline,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         podcast.formattedViews,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                      Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
                       const SizedBox(width: 4),
-                      Text(
-                        podcast.formattedDuration,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      Expanded(
+                        child: Text(
+                          podcast.formattedDuration,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -89,7 +111,11 @@ class PodcastListItem extends StatelessWidget {
                   // Date
                   Text(
                     podcast.formattedDate,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
