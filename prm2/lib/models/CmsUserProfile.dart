@@ -1,5 +1,3 @@
-
-
 import 'package:intl/intl.dart';
 
 class CmsUserProfile {
@@ -19,6 +17,7 @@ class CmsUserProfile {
     required this.createdAt,
   });
 
+  // Helper getter để format ngày tạo
   String get formattedCreatedAt {
     return DateFormat('dd/MM/yyyy').format(createdAt);
   }
@@ -34,4 +33,3 @@ class CmsUserProfile {
     );
   }
 }
-

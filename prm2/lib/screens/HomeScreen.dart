@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:prm2/screens/SubscriptionDetailScreen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../components/DashboardCard.dart';
 import '../services/api_service.dart';
@@ -10,9 +11,7 @@ import 'PaymentMethodListScreen.dart';
 import 'PodcastListScreen.dart';
 import 'PodcastStatisticsDashboard.dart';
 import 'UserManagementScreen.dart';
-
-
-
+import 'SubscriptionPlanManagementScreen.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -131,6 +130,18 @@ class HomeScreen extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (c) => const PaymentMethodListScreen()),
+          );
+        },
+      ),
+
+      DashboardCard(
+        icon: Icons.group_outlined,
+        title: 'Quản lý gói đăng ký',
+        subtitle: 'Xem, tạo, sửa, xóa',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SubscriptionPlanManagementScreen()),
           );
         },
       ),

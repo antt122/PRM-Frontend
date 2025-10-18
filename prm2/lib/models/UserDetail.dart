@@ -1,6 +1,3 @@
-
-
-// Model này chứa thông tin chi tiết đầy đủ của người dùng
 import 'package:intl/intl.dart';
 
 class UserDetail {

@@ -1,4 +1,3 @@
-// Model cho kết quả trả về sau khi tạo người dùng thành công
 class CreateUserResponse {
   final String userProfileId;
   final String email;
@@ -18,4 +17,3 @@ class CreateUserResponse {
     );
   }
 }
-
