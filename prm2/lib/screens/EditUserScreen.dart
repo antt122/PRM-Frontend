@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../components/CustomButton.dart';
 import '../components/CustomTextField.dart';
 import '../models/UserDetail.dart';
@@ -89,12 +90,20 @@ class _UpdateInfoTabState extends State<_UpdateInfoTab> {
     _addressController = TextEditingController(text: widget.user.address);
   }
 
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isLoading = true; });
 
     final result = await _apiService.updateUserInfo(
-      // --- SỬA LỖI Ở ĐÂY ---
       userId: widget.user.userId,
       fullName: _fullNameController.text,
       email: _emailController.text,
@@ -109,7 +118,7 @@ class _UpdateInfoTabState extends State<_UpdateInfoTab> {
           backgroundColor: result.isSuccess ? Colors.green : kAdminErrorColor,
         ),
       );
-      if (result.isSuccess) Navigator.pop(context, true); // Quay về và báo hiệu thành công
+      if (result.isSuccess) Navigator.pop(context, true);
     }
     setState(() { _isLoading = false; });
   }
@@ -148,7 +157,6 @@ class _UpdateRolesTab extends StatefulWidget {
 }
 
 class _UpdateRolesTabState extends State<_UpdateRolesTab> {
-  // Định nghĩa tất cả các vai trò có thể có
   static const Map<String, int> _allRoles = {
     'Admin': 0, 'Staff': 1, 'User': 2, 'ContentCreator': 3,
   };
@@ -172,7 +180,6 @@ class _UpdateRolesTabState extends State<_UpdateRolesTab> {
     final rolesToRemove = _initialRoles.difference(_selectedRoles).map((roleName) => _allRoles[roleName]!).toList();
 
     final result = await _apiService.updateUserRoles(
-      // --- SỬA LỖI Ở ĐÂY ---
       userId: widget.user.userId,
       rolesToAdd: rolesToAdd,
       rolesToRemove: rolesToRemove,
@@ -241,10 +248,15 @@ class _UpdateStatusTabState extends State<_UpdateStatusTab> {
     _selectedStatus = widget.user.status;
   }
 
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
   Future<void> _submit() async {
     setState(() { _isLoading = true; });
     final result = await _apiService.updateUserStatus(
-      // --- SỬA LỖI Ở ĐÂY ---
       userId: widget.user.userId,
       status: _selectedStatus,
       reason: _reasonController.text.isNotEmpty ? _reasonController.text : null,

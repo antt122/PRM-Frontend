@@ -8,12 +8,19 @@ import '../models/CmsUser.dart';
 import '../models/CmsUserProfile.dart';
 import '../models/CreatePlanRequest.dart';
 import '../models/CreateUserResponse.dart';
+import '../models/CreatorApplicationDetail.dart';
+import '../models/CreatorApplicationListItem.dart';
 import '../models/LoginData.dart';
+import '../models/PaginatedResult.dart';
 import '../models/SubscriptionFilters.dart';
 import '../models/UpdatePlanRequest.dart';
 import '../models/UpdateUserResponse.dart';
 import '../models/UserDetail.dart';
-import '../models/api_result.dart';
+import '../models/ApiResult.dart';
+
+
+
+
 import '../models/Subscription.dart';
 import '../models/SubscriptionPlan.dart';
 import '../models/SubscriptionPlanFilters.dart';
@@ -27,11 +34,18 @@ class ApiService {
   static String get _creatorApiUrl => '$_baseUrl';
   static String get _cmsUrl => '$_baseUrl/cms';
 
+  static String get _creatorApplicationsUrl => '$_baseUrl/CreatorApplications';
+
   static String get _loginUrl => '$_cmsUrl/auth/login';
+
   static String get _createCmsUserUrl => '$_cmsUrl/users';
+
   static String get _logoutUrl => '$_cmsUrl/logout';
-  static String get _getCmsUsersUrl =>'$_cmsUrl/users';
+
+  static String get _getCmsUsersUrl => '$_cmsUrl/users';
+
   static String get _getCmsUserProfileUrl => '$_cmsUrl/users/profile';
+
   static String get _cmsUsersUrlProfileDetail => '$_cmsUrl/users';
   static String get _getUserSubscriptionsCms=> '$_cmsUrl/subscriptions';
   static String get _getSubscriptionPlansCms => '$_cmsUrl/subscription-plans';
@@ -45,17 +59,13 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken');
 
-    final headers = {
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',  // Bypass ngrok free tier browser warning
-      'User-Agent': 'Flutter-Client',  // Identify as non-browser for ngrok
-    };
-
     if (token != null) {
-      headers['Authorization'] = 'Bearer $token';
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
     }
-
-    return headers;
+    return {'Content-Type': 'application/json'};
   }
 
   static Future<ApiResult<LoginData>> login({
@@ -68,6 +78,7 @@ class ApiService {
       'password': password,
       'grantType': 0,
     };
+
     try {
       final response = await http.post(
         url,
@@ -126,7 +137,8 @@ class ApiService {
             (data) => CreateUserResponse.fromJson(data as Map<String, dynamic>),
       );
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+      return ApiResult(
+          isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
     }
   }
 
@@ -146,7 +158,8 @@ class ApiService {
       return ApiResult.fromJson(jsonResponse, (data) => null);
     } catch (e) {
       // Ngay cả khi API lỗi, chúng ta vẫn nên coi như đăng xuất thành công ở phía client
-      return ApiResult(isSuccess: true, message: 'Đã xảy ra lỗi phía server, nhưng client sẽ đăng xuất.');
+      return ApiResult(isSuccess: true,
+          message: 'Đã xảy ra lỗi phía server, nhưng client sẽ đăng xuất.');
     }
   }
 
@@ -167,7 +180,8 @@ class ApiService {
       if (search != null && search.isNotEmpty) 'search': search,
       if (status != null) 'status': status.toString(), // Thêm status vào query
     };
-    final uri = Uri.parse(_getCmsUsersUrl).replace(queryParameters: queryParams);
+    final uri = Uri.parse(_getCmsUsersUrl).replace(
+        queryParameters: queryParams);
 
     try {
       final headers = await _getAuthHeaders();
@@ -176,7 +190,8 @@ class ApiService {
 
       if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
         // Trường hợp thành công
-        final paginatedData = PaginatedResult.fromJson(jsonResponse, (userJson) => CmsUser.fromJson(userJson));
+        final paginatedData = PaginatedResult.fromJson(
+            jsonResponse, (userJson) => CmsUser.fromJson(userJson));
         return ApiResult(isSuccess: true, data: paginatedData);
       } else {
         // SỬA LỖI: Trường hợp thất bại, tạo đối tượng ApiResult trực tiếp
@@ -188,7 +203,8 @@ class ApiService {
         );
       }
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+      return ApiResult(
+          isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
     }
   }
 
@@ -200,7 +216,8 @@ class ApiService {
       final jsonResponse = jsonDecode(response.body);
 
       if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
-        return ApiResult.fromJson(jsonResponse, (data) => CmsUserProfile.fromJson(data as Map<String, dynamic>));
+        return ApiResult.fromJson(jsonResponse, (data) =>
+            CmsUserProfile.fromJson(data as Map<String, dynamic>));
       } else {
         return ApiResult(
           isSuccess: jsonResponse['isSuccess'] ?? false,
@@ -208,7 +225,8 @@ class ApiService {
         );
       }
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+      return ApiResult(
+          isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
     }
   }
 
@@ -221,7 +239,8 @@ class ApiService {
 
       if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
         return ApiResult.fromJson(
-            jsonResponse, (data) => UserDetail.fromJson(data as Map<String, dynamic>));
+            jsonResponse, (data) =>
+            UserDetail.fromJson(data as Map<String, dynamic>));
       } else {
         return ApiResult(
           isSuccess: jsonResponse['isSuccess'] ?? false,
@@ -229,7 +248,8 @@ class ApiService {
         );
       }
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+      return ApiResult(
+          isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
     }
   }
 
@@ -251,9 +271,11 @@ class ApiService {
       final headers = await _getAuthHeaders();
       final response = await http.put(uri, headers: headers, body: body);
       final jsonResponse = jsonDecode(response.body);
-      return ApiResult.fromJson(jsonResponse, (data) => UpdateUserResponse.fromJson(data as Map<String, dynamic>));
+      return ApiResult.fromJson(jsonResponse, (data) =>
+          UpdateUserResponse.fromJson(data as Map<String, dynamic>));
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+      return ApiResult(
+          isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
     }
   }
 
@@ -279,7 +301,8 @@ class ApiService {
         errors: (jsonResponse['errors'] as List<dynamic>?)?.cast<String>(),
       );
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+      return ApiResult(
+          isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
     }
   }
 
@@ -305,10 +328,92 @@ class ApiService {
         errors: (jsonResponse['errors'] as List<dynamic>?)?.cast<String>(),
       );
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+      return ApiResult(
+          isSuccess: false, message: 'Đã xảy ra lỗi: ${e.toString()}');
+    }
+  }
+  // --- HÀM 1: LẤY DANH SÁCH ĐƠN (ĐÃ CẬP NHẬT) ---
+  Future<ApiResult<List<CreatorApplicationListItem>>> getPendingApplications({int pageNumber = 1, int pageSize = 10}) async {
+    final uri = Uri.parse('$_creatorApplicationsUrl/pending').replace(queryParameters: {
+      'pageNumber': pageNumber.toString(),
+      'pageSize': pageSize.toString(),
+    });
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+
+      // API này trả về một mảng JSON trực tiếp
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = jsonDecode(response.body);
+        final applications = jsonList.map((item) => CreatorApplicationListItem.fromJson(item)).toList();
+        return ApiResult(isSuccess: true, data: applications);
+      } else {
+        final jsonResponse = jsonDecode(response.body);
+        return ApiResult(
+          isSuccess: jsonResponse['isSuccess'] ?? false,
+          message: jsonResponse['message'],
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: e.toString());
     }
   }
 
+  Future<ApiResult<CreatorApplicationDetail>> getApplicationDetails(String applicationId) async {
+    final uri = Uri.parse('$_creatorApplicationsUrl/$applicationId');
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+      final jsonResponse = jsonDecode(response.body);
+
+      // API này trả về dữ liệu trực tiếp, không có cấu trúc isSuccess/data
+      if (response.statusCode == 200) {
+        final detail = CreatorApplicationDetail.fromJson(jsonResponse);
+        return ApiResult(isSuccess: true, data: detail);
+      } else {
+        // Xử lý các mã lỗi khác từ server
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] as String? ?? 'Lỗi ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: e.toString());
+    }
+  }
+
+
+  Future<ApiResult<dynamic>> approveApplication({required String applicationId, String? notes}) async {
+    final uri = Uri.parse('$_creatorApplicationsUrl/$applicationId/approve');
+    final body = jsonEncode({'applicationId': applicationId, 'notes': notes});
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(uri, headers: headers, body: body);
+      final jsonResponse = jsonDecode(response.body);
+      return ApiResult(
+        isSuccess: jsonResponse['success'] ?? false,
+        message: jsonResponse['message'],
+      );
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: e.toString());
+    }
+  }
+
+  Future<ApiResult<dynamic>> rejectApplication({required String applicationId, required String reason, String? notes}) async {
+    final uri = Uri.parse('$_creatorApplicationsUrl/$applicationId/reject');
+    final body = jsonEncode({'applicationId': applicationId, 'rejectionReason': reason, 'notes': notes});
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(uri, headers: headers, body: body);
+      final jsonResponse = jsonDecode(response.body);
+      return ApiResult(
+        isSuccess: jsonResponse['success'] ?? false,
+        message: jsonResponse['message'],
+      );
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: e.toString());
+    }
+  }
   Future<ApiResult<PaginatedResult<Subscription>>> getSubscriptions(
       SubscriptionFilters filters,
       ) async {
@@ -584,5 +689,6 @@ class ApiService {
       return ApiResult(isSuccess: false, message: "Lỗi kết nối: ${e.toString()}");
     }
   }
-// ... (các hàm khác)
 }
+
+

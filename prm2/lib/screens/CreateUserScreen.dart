@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../components/CustomButton.dart';
 import '../components/CustomTextField.dart';
 import '../services/api_service.dart';
@@ -19,12 +20,10 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
   final _addressController = TextEditingController();
   final ApiService _apiService = ApiService();
 
-  // --- THAY ĐỔI: Giá trị mặc định là Admin (id=0) ---
-  int _selectedRole = 0;
+  int _selectedRole = 2; // Mặc định là User (ID=2)
   bool _isLoading = false;
 
   Future<void> _createUser() async {
-    // Thêm kiểm tra validation đơn giản
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty || _fullNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -54,7 +53,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true); // Quay về và báo hiệu đã tạo thành công
+        Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -83,9 +82,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
     return Scaffold(
       backgroundColor: kAdminBackgroundColor,
       appBar: AppBar(
-        title: const Text('Tạo người dùng mới', style: TextStyle(color: kAdminPrimaryTextColor)),
-        backgroundColor: kAdminBackgroundColor,
-        iconTheme: const IconThemeData(color: kAdminPrimaryTextColor),
+        title: const Text('Tạo người dùng mới'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -116,35 +113,25 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
   }
 
   Widget _buildRoleDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: kAdminCardColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: kAdminInputBorderColor),
+    return DropdownButtonFormField<int>(
+      value: _selectedRole,
+      decoration: const InputDecoration(
+        labelText: 'Vai trò',
+        border: OutlineInputBorder(),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<int>(
-          value: _selectedRole,
-          isExpanded: true,
-          dropdownColor: kAdminCardColor,
-          style: const TextStyle(color: kAdminPrimaryTextColor, fontSize: 16),
-          // --- CẬP NHẬT LẠI GIÁ TRỊ VÀ THỨ TỰ Ở ĐÂY ---
-          items: const [
-            DropdownMenuItem(value: 0, child: Text('Admin')),
-            DropdownMenuItem(value: 1, child: Text('Staff')),
-            DropdownMenuItem(value: 2, child: Text('User')),
-            DropdownMenuItem(value: 3, child: Text('Content Creator')),
-          ],
-          onChanged: (value) {
-            if (value != null) {
-              setState(() {
-                _selectedRole = value;
-              });
-            }
-          },
-        ),
-      ),
+      items: const [
+        DropdownMenuItem(value: 0, child: Text('Admin')),
+        DropdownMenuItem(value: 1, child: Text('Staff')),
+        DropdownMenuItem(value: 2, child: Text('User')),
+        DropdownMenuItem(value: 3, child: Text('Content Creator')),
+      ],
+      onChanged: (value) {
+        if (value != null) {
+          setState(() {
+            _selectedRole = value;
+          });
+        }
+      },
     );
   }
 }

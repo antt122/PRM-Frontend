@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/CmsUserProfile.dart';
-import '../models/api_result.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import 'LoginScreen.dart';
+
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -14,12 +15,21 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _apiService = ApiService();
-  late Future<ApiResult<CmsUserProfile>> _profileFuture;
+  late Future<CmsUserProfile> _profileFuture;
 
   @override
   void initState() {
     super.initState();
-    _profileFuture = _apiService.getCmsUserProfile();
+    _profileFuture = _fetchProfile();
+  }
+
+  Future<CmsUserProfile> _fetchProfile() async {
+    final result = await _apiService.getCmsUserProfile();
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
+    } else {
+      throw Exception(result.message ?? 'Failed to load profile');
+    }
   }
 
   void _handleLogout(BuildContext context) async {
@@ -40,28 +50,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: kAdminBackgroundColor,
       appBar: AppBar(
-        title: const Text('Hồ sơ của tôi', style: TextStyle(color: kAdminPrimaryTextColor)),
-        backgroundColor: kAdminBackgroundColor,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: kAdminPrimaryTextColor),
+        title: const Text('Hồ sơ của tôi'),
       ),
-      body: FutureBuilder<ApiResult<CmsUserProfile>>(
+      body: FutureBuilder<CmsUserProfile>(
         future: _profileFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: kAdminAccentColor));
+            return const Center(child: CircularProgressIndicator());
           }
-          if (!snapshot.hasData || !snapshot.data!.isSuccess || snapshot.data!.data == null) {
-            return Center(
-              child: Text(
-                'Lỗi tải thông tin: ${snapshot.data?.message ?? "Vui lòng thử lại."}',
-                style: const TextStyle(color: kAdminSecondaryTextColor),
-              ),
-            );
+          if (snapshot.hasError || !snapshot.hasData) {
+            return Center(child: Text('Lỗi tải thông tin: ${snapshot.error}'));
           }
-
-          final userProfile = snapshot.data!.data!;
-          return _buildProfileView(context, userProfile);
+          final profile = snapshot.data!;
+          return _buildProfileView(context, profile);
         },
       ),
     );
@@ -73,82 +74,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Avatar
-          CircleAvatar(
+          const CircleAvatar(
             radius: 60,
-            backgroundColor: kAdminCardColor,
-            backgroundImage: profile.avatarPath != null ? NetworkImage(profile.avatarPath!) : null,
-            child: profile.avatarPath == null
-                ? const Icon(Icons.person_outline, size: 60, color: kAdminSecondaryTextColor)
-                : null,
+            child: Icon(Icons.person, size: 60),
           ),
           const SizedBox(height: 16),
-          // Full Name
-          Text(
-            profile.fullName,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: kAdminPrimaryTextColor),
-          ),
+          Text(profile.fullName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          // Email
-          Text(
-            profile.email,
-            style: const TextStyle(fontSize: 16, color: kAdminSecondaryTextColor),
+          Text(profile.email, style: const TextStyle(fontSize: 16, color: kAdminSecondaryTextColor)),
+          const SizedBox(height: 32),
+          ListTile(
+            leading: const Icon(Icons.phone_outlined),
+            title: const Text('Số điện thoại'),
+            subtitle: Text(profile.phoneNumber ?? 'Chưa cập nhật'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.location_on_outlined),
+            title: const Text('Địa chỉ'),
+            subtitle: Text(profile.address ?? 'Chưa cập nhật'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.calendar_today_outlined),
+            title: const Text('Ngày tham gia'),
+            subtitle: Text(profile.formattedCreatedAt),
           ),
           const SizedBox(height: 32),
-          // Information Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: kAdminCardColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                _buildInfoTile(Icons.phone_outlined, 'Số điện thoại', profile.phoneNumber ?? 'Chưa cập nhật'),
-                const Divider(color: kAdminInputBorderColor),
-                _buildInfoTile(Icons.location_on_outlined, 'Địa chỉ', profile.address ?? 'Chưa cập nhật'),
-                const Divider(color: kAdminInputBorderColor),
-                _buildInfoTile(Icons.calendar_today_outlined, 'Ngày tham gia', profile.formattedCreatedAt),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          // Buttons
           ElevatedButton(
             onPressed: () {
               // TODO: Điều hướng đến màn hình chỉnh sửa thông tin
             },
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              backgroundColor: kAdminAccentColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Cập nhật thông tin', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text('Cập nhật thông tin'),
           ),
           const SizedBox(height: 16),
           OutlinedButton(
             onPressed: () => _handleLogout(context),
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
               side: const BorderSide(color: kAdminErrorColor),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('Đăng xuất', style: TextStyle(color: kAdminErrorColor, fontWeight: FontWeight.bold)),
+            child: const Text('Đăng xuất', style: TextStyle(color: kAdminErrorColor)),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildInfoTile(IconData icon, String title, String subtitle) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: kAdminSecondaryTextColor),
-      title: Text(title, style: const TextStyle(color: kAdminSecondaryTextColor)),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(color: kAdminPrimaryTextColor, fontSize: 16, fontWeight: FontWeight.w500),
-      ),
-    );
-  }
 }
+

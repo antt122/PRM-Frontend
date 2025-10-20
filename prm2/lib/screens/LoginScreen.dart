@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../components/CustomButton.dart';
 import '../components/CustomTextField.dart';
-import '../models/api_result.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import 'HomeScreen.dart';
@@ -128,3 +127,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

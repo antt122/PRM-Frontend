@@ -1,4 +1,4 @@
-// Model để chứa dữ liệu trả về sau khi cập nhật thông tin người dùng
+// Model để chứa dữ liệu trả về sau khi cập nhật thông tin người dùng thành công
 class UpdateUserResponse {
   final String id;
   final String fullName;
