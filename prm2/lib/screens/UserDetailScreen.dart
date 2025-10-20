@@ -4,6 +4,9 @@ import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import 'EditUserScreen.dart';
 
+// --- THÊM IMPORT CHO MÀN HÌNH SUBSCRIPTION ---
+import 'UserSubcriptionScreen.dart';
+// ------------------------------------------
 
 class UserDetailScreen extends StatefulWidget {
   final String userId;
@@ -42,15 +45,26 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             onPressed: () async {
-              final user = await _userDetailFuture;
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => EditUserScreen(user: user)),
-              );
-              if (result == true) {
-                setState(() {
-                  _userDetailFuture = _fetchUserDetails(); // Refresh data
-                });
+              // Chờ future hoàn thành để lấy data
+              // Dùng try-catch để xử lý nếu future bị lỗi
+              try {
+                final user = await _userDetailFuture;
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => EditUserScreen(user: user)),
+                );
+                if (result == true) {
+                  setState(() {
+                    _userDetailFuture = _fetchUserDetails(); // Refresh data
+                  });
+                }
+              } catch (e) {
+                // Hiển thị thông báo lỗi nếu không thể mở trang edit
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Không thể tải dữ liệu để chỉnh sửa: $e')),
+                  );
+                }
               }
             },
           ),
@@ -84,7 +98,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             children: [
               CircleAvatar(
                 radius: 50,
-                child: Text(user.fullName[0], style: const TextStyle(fontSize: 40)),
+                // Hiển thị chữ cái đầu, kiểm tra chuỗi rỗng
+                child: Text(
+                  user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
+                  style: const TextStyle(fontSize: 40),
+                ),
               ),
               const SizedBox(height: 16),
               Text(user.fullName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -98,15 +116,42 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         _buildInfoTile('Ngày tham gia', user.formattedCreatedAt),
         _buildInfoTile('Đăng nhập lần cuối', user.formattedLastLoginAt),
         _buildInfoTile('Vai trò', user.roles.join(', ')),
+
+        // --- BUTTON MỚI ĐỂ XEM SUBSCRIPTIONS ---
+        const SizedBox(height: 24),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.subscriptions_outlined),
+          label: const Text('Xem Lịch sử Gói Đăng ký'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () {
+            // Điều hướng qua UserSubscriptionScreen và truyền userId
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserSubscriptionScreen(
+                  userId: widget.userId,
+                ),
+              ),
+            );
+          },
+        ),
+        // --- KẾT THÚC BUTTON MỚI ---
       ],
     );
   }
 
   Widget _buildInfoTile(String title, String subtitle) {
     return ListTile(
+      contentPadding: EdgeInsets.zero, // Bỏ padding mặc định
       title: Text(title, style: const TextStyle(color: kAdminSecondaryTextColor)),
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 16, color: kAdminPrimaryTextColor)),
     );
   }
 }
-
