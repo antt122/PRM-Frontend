@@ -80,20 +80,6 @@ class PendingPodcastCard extends StatelessWidget {
                   'Tạo ${timeago.format(podcast.publishedAt, locale: 'vi')}',
                   style: const TextStyle(color: kAdminSecondaryTextColor, fontSize: 12),
                 ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.check_circle_outline, color: Colors.green),
-                      tooltip: 'Duyệt',
-                      onPressed: () => _showActionDialog(context, 'Duyệt'),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.highlight_off, color: kAdminErrorColor),
-                      tooltip: 'Từ chối',
-                      onPressed: () => _showActionDialog(context, 'Từ chối'),
-                    ),
-                  ],
-                )
               ],
             ),
           ],

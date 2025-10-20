@@ -12,9 +12,12 @@ import 'PodcastListScreen.dart';
 import 'PodcastStatisticsDashboard.dart';
 import 'UserManagementScreen.dart';
 import 'SubscriptionPlanManagementScreen.dart';
+
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  // Hàm xử lý đăng xuất
   void _handleLogout(BuildContext context) async {
     final bool? confirmLogout = await showDialog<bool>(
       context: context,
@@ -32,8 +35,8 @@ class HomeScreen extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
-              child:
-              const Text('Đăng xuất', style: TextStyle(color: kAdminErrorColor)),
+              child: const Text('Đăng xuất',
+                  style: TextStyle(color: kAdminErrorColor)),
               onPressed: () => Navigator.of(context).pop(true),
             ),
           ],
@@ -71,43 +74,22 @@ class HomeScreen extends StatelessWidget {
           );
         },
       ),
-      // --- THÊM CHỨC NĂNG MỚI Ở ĐÂY ---
       DashboardCard(
-        icon: Icons.forum_outlined,
-        title: 'Community Stories',
-        subtitle: 'Duyệt và quản lý bài viết',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const CommunityStoriesScreen()),
-          );
-        },
-      ),
-      DashboardCard(
-        icon: Icons.bar_chart_outlined,
-        title: 'Thống kê',
-        subtitle: 'Xem báo cáo, doanh thu',
-        onTap: () {},
-      ),
-      DashboardCard(
-        icon: Icons.settings_outlined,
-        title: 'Cài đặt',
-        subtitle: 'Cấu hình hệ thống',
-        onTap: () {},
-      ),
-      DashboardCard(
-        icon: Icons.podcasts_outlined, title: 'Quản lý Podcasts',
+        icon: Icons.podcasts_outlined,
+        title: 'Quản lý Podcasts',
         subtitle: 'Duyệt và quản lý podcasts',
-        onTap: () => Navigator.push(context, MaterialPageRoute(
-            builder: (c) => const PodcastListScreen())),
+        onTap: () => Navigator.push(
+            context, MaterialPageRoute(builder: (c) => const PodcastListScreen())),
       ),
       DashboardCard(
         icon: Icons.bar_chart_outlined,
         title: 'Thống kê',
         subtitle: 'Xem báo cáo tổng quan',
         onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (c) => const PodcastStatisticsDashboard()));
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (c) => const PodcastStatisticsDashboard()));
         },
       ),
       DashboardCard(
@@ -117,11 +99,11 @@ class HomeScreen extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (c) => const CreatorApplicationListScreen()),
+            MaterialPageRoute(
+                builder: (c) => const CreatorApplicationListScreen()),
           );
         },
       ),
-
       DashboardCard(
         icon: Icons.payment_outlined,
         title: 'Quản lý Thanh toán',
@@ -133,7 +115,6 @@ class HomeScreen extends StatelessWidget {
           );
         },
       ),
-
       DashboardCard(
         icon: Icons.group_outlined,
         title: 'Quản lý gói đăng ký',
@@ -141,7 +122,8 @@ class HomeScreen extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const SubscriptionPlanManagementScreen()),
+            MaterialPageRoute(
+                builder: (context) => const SubscriptionPlanManagementScreen()),
           );
         },
       ),
@@ -165,18 +147,20 @@ class HomeScreen extends StatelessWidget {
           )
         ],
       ),
-      body: ListView.separated(
+      // SỬ DỤNG GRIDVIEW ĐỂ HIỂN THỊ DẠNG LƯỚI RESPONSIVE
+      body: GridView.builder(
         padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,      // Hiển thị 2 cột
+          crossAxisSpacing: 16,   // Khoảng cách ngang
+          mainAxisSpacing: 16,    // Khoảng cách dọc
+          childAspectRatio: 0.9,  // Tỷ lệ W/H của thẻ (1.0 = vuông)
+        ),
         itemCount: dashboardItems.length,
         itemBuilder: (context, index) {
-          return SizedBox(
-            height: 150, // Chiều cao cố định cho mỗi thẻ
-            child: dashboardItems[index],
-          );
+          return dashboardItems[index];
         },
-        separatorBuilder: (context, index) => const SizedBox(height: 16),
       ),
     );
   }
 }
-

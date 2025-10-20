@@ -92,7 +92,7 @@ class _PodcastDetailAdminScreenState extends ConsumerState<PodcastDetailAdminScr
                           _buildChipWrap([...podcast.emotionCategories.map((id) => CategoryHelper.podcastEmotions[id] ?? ''),
                             ...podcast.topicCategories.map((id) => CategoryHelper.podcastTopics[id] ?? '')]),
                           // Tăng khoảng trống để không bị che khuất ngay cả khi action bar không hiển thị
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 120              ),
                         ],
                       ),
                     ),
@@ -111,8 +111,6 @@ class _PodcastDetailAdminScreenState extends ConsumerState<PodcastDetailAdminScr
       ),
     );
   }
-
-  // --- CÁC WIDGET GIAO DIỆN (ĐÃ CẬP NHẬT ĐẦY ĐỦ) ---
 
   SliverAppBar _buildSliverAppBar(BuildContext context, PodcastDetail podcast) {
     return SliverAppBar(
@@ -201,31 +199,63 @@ class _PodcastDetailAdminScreenState extends ConsumerState<PodcastDetailAdminScr
     );
   }
 
+  // Widget _buildHeader(BuildContext context, PodcastDetail podcast) {
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Text(podcast.title, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: kAdminPrimaryTextColor)),
+  //       const SizedBox(height: 8),
+  //       Text('${podcast.seriesName} • Tập ${podcast.episodeNumber}', style: const TextStyle(fontSize: 18, color: kAdminSecondaryTextColor)),
+  //       const SizedBox(height: 16),
+  //       Row(
+  //         children: [
+  //           _buildInfoChip(Icons.mic_none_outlined, podcast.hostName),
+  //           const SizedBox(width: 16),
+  //           _buildInfoChip(Icons.person_outline, podcast.guestName),
+  //           const Spacer(),
+  //           _buildInfoChip(Icons.timer_outlined, podcast.duration),
+  //         ],
+  //       ),
+  //       const SizedBox(height: 12),
+  //       Row(
+  //         children: [
+  //           _buildInfoChip(Icons.visibility_outlined, NumberFormat.compact().format(podcast.viewCount)),
+  //           const SizedBox(width: 16),
+  //           _buildInfoChip(Icons.favorite_outline, NumberFormat.compact().format(podcast.likeCount)),
+  //         ],
+  //       ),
+  //     ],
+  //   );
+  // }
   Widget _buildHeader(BuildContext context, PodcastDetail podcast) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(podcast.title, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: kAdminPrimaryTextColor)),
+        // Phần tiêu đề giữ nguyên
+        Text(podcast.title,
+            style: Theme.of(context)
+                .textTheme
+                .headlineMedium
+                ?.copyWith(fontWeight: FontWeight.bold, color: kAdminPrimaryTextColor)),
         const SizedBox(height: 8),
-        Text('${podcast.seriesName} • Tập ${podcast.episodeNumber}', style: const TextStyle(fontSize: 18, color: kAdminSecondaryTextColor)),
+        Text('${podcast.seriesName} • Tập ${podcast.episodeNumber}',
+            style: const TextStyle(fontSize: 18, color: kAdminSecondaryTextColor)),
         const SizedBox(height: 16),
-        Row(
+
+        // THAY THẾ TOÀN BỘ CÁC ROW BẰNG MỘT WIDGET WRAP DUY NHẤT
+        Wrap(
+          spacing: 16.0, // Khoảng cách ngang giữa các mục
+          runSpacing: 10.0, // Khoảng cách dọc khi xuống dòng
           children: [
             _buildInfoChip(Icons.mic_none_outlined, podcast.hostName),
-            const SizedBox(width: 16),
             _buildInfoChip(Icons.person_outline, podcast.guestName),
-            const Spacer(),
             _buildInfoChip(Icons.timer_outlined, podcast.duration),
+            _buildInfoChip(Icons.visibility_outlined,
+                NumberFormat.compact().format(podcast.viewCount)),
+            _buildInfoChip(Icons.favorite_outline,
+                NumberFormat.compact().format(podcast.likeCount)),
           ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _buildInfoChip(Icons.visibility_outlined, NumberFormat.compact().format(podcast.viewCount)),
-            const SizedBox(width: 16),
-            _buildInfoChip(Icons.favorite_outline, NumberFormat.compact().format(podcast.likeCount)),
-          ],
-        ),
+        )
       ],
     );
   }

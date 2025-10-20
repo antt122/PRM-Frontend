@@ -190,14 +190,25 @@ class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailS
     );
   }
 
+// HÀM _buildAuditRow ĐÃ SỬA LỖI
   Widget _buildAuditRow(String label, String? user, String date) {
     return Padding(
       padding: const EdgeInsets.only(top: 8.0),
       child: Row(
+        // Canh icon và text thẳng hàng theo chiều dọc
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.person_outline, size: 16, color: kAdminSecondaryTextColor),
           const SizedBox(width: 8),
-          Text('$label ${user ?? 'N/A'} • $date', style: const TextStyle(color: kAdminSecondaryTextColor, fontSize: 12)),
+          // THAY ĐỔI QUAN TRỌNG NHẤT: BỌC TEXT BẰNG EXPANDED
+          Expanded(
+            child: Text(
+              '$label ${user ?? 'N/A'} • $date',
+              style: const TextStyle(color: kAdminSecondaryTextColor, fontSize: 12),
+              // softWrap: true là mặc định, nhưng để đây cho rõ ràng
+              softWrap: true,
+            ),
+          ),
         ],
       ),
     );

@@ -16,9 +16,7 @@ abstract class IPodcastService {
 }
 
 class PodcastService implements IPodcastService {
-  // String get _baseUrl => dotenv.env['BASE_URL'] ?? '' ;
-  String get _baseUrl =>  'http://localhost:5004/api';
-
+  String get _baseUrl => dotenv.env['BASE_URL'] ?? '';
   String get _podcastsUrl => '$_baseUrl/cms/podcasts';
   String get _pendingPodcastsUrl => '$_baseUrl/cms/podcasts/pending';
 
@@ -57,8 +55,6 @@ class PodcastService implements IPodcastService {
       if (response.statusCode == 200) {
         return ApiResult(isSuccess: true, data: PaginatedPodcastsResponse.fromJson(jsonResponse));
       } else {
-        // --- SỬA LỖI Ở ĐÂY ---
-        // Tạo ApiResult trực tiếp để tránh lỗi suy luận kiểu dữ liệu
         return ApiResult(
           isSuccess: jsonResponse['isSuccess'] ?? false,
           message: jsonResponse['message'],
