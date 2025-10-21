@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:provider/provider.dart';
 import '../services/audio_player_service.dart';
 import '../screens/podcast_detail_screen.dart';
@@ -22,7 +23,8 @@ class MiniPlayer extends StatelessWidget {
         return GestureDetector(
           onTap: () {
             // Navigate to full player (podcast detail screen)
-            // Note: Creator restrictions (like/view) are handled in PodcastDetailScreen
+            // Note: View tracking is handled in PodcastDetailScreen
+            // We don't track view here to avoid duplicate tracking
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -34,18 +36,8 @@ class MiniPlayer extends StatelessWidget {
               ),
             );
           },
-          child: Container(
+          child: _LiquidGlassMiniPlayer(
             height: 70,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1a1a1a),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
             child: Column(
               children: [
                 // Progress bar
@@ -60,9 +52,11 @@ class MiniPlayer extends StatelessWidget {
 
                     return LinearProgressIndicator(
                       value: progress,
-                      backgroundColor: Colors.grey.shade800,
+                      backgroundColor: Colors.white.withOpacity(0.2),
                       valueColor: const AlwaysStoppedAnimation<Color>(
-                        Color(0xFF1DB954), // Spotify green
+                        Color(
+                          0xFF007AFF,
+                        ), // iOS blue to match liquid glass theme
                       ),
                       minHeight: 2,
                     );
@@ -72,23 +66,39 @@ class MiniPlayer extends StatelessWidget {
                 // Player controls
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
                         // Thumbnail
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(6),
                           child: S3CachedImage(
-                            imageUrl: podcast.thumbnailUrl ?? 'https://via.placeholder.com/50',
-                            width: 50,
-                            height: 50,
+                            imageUrl:
+                                podcast.thumbnailUrl ??
+                                'https://via.placeholder.com/50',
+                            width: 44,
+                            height: 44,
                             fit: BoxFit.cover,
                             errorWidget: (context, url, error) {
                               return Container(
-                                width: 50,
-                                height: 50,
-                                color: Colors.grey.shade800,
-                                child: const Icon(Icons.music_note, color: Colors.white54),
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.2),
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.music_note,
+                                  color: Colors.white70,
+                                  size: 20,
+                                ),
                               );
                             },
                           ),
@@ -115,8 +125,8 @@ class MiniPlayer extends StatelessWidget {
                               const SizedBox(height: 2),
                               Text(
                                 podcast.hostName ?? 'Unknown Host',
-                                style: TextStyle(
-                                  color: Colors.grey.shade400,
+                                style: const TextStyle(
+                                  color: Colors.white70,
                                   fontSize: 12,
                                 ),
                                 maxLines: 1,
@@ -126,7 +136,7 @@ class MiniPlayer extends StatelessWidget {
                           ),
                         ),
 
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
 
                         // Play/Pause button
                         StreamBuilder<bool>(
@@ -137,9 +147,14 @@ class MiniPlayer extends StatelessWidget {
                               icon: Icon(
                                 isPlaying ? Icons.pause : Icons.play_arrow,
                                 color: Colors.white,
-                                size: 32,
+                                size: 28,
                               ),
                               onPressed: () => audioService.togglePlayPause(),
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
                             );
                           },
                         ),
@@ -149,9 +164,14 @@ class MiniPlayer extends StatelessWidget {
                           icon: const Icon(
                             Icons.close,
                             color: Colors.white70,
-                            size: 20,
+                            size: 18,
                           ),
                           onPressed: () => audioService.stop(),
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
                         ),
                       ],
                     ),
@@ -162,6 +182,49 @@ class MiniPlayer extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Custom liquid glass container for mini player
+class _LiquidGlassMiniPlayer extends StatelessWidget {
+  final double height;
+  final Widget child;
+
+  const _LiquidGlassMiniPlayer({required this.height, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(
+          12,
+        ), // Bo tròn nhỏ hơn như Apple Music
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), // Blur mạnh hơn
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.4), // Đậm hơn một chút
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.15),
+                width: 0.5, // Border mỏng hơn
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 30,
+                  offset: const Offset(0, -8),
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: child,
+          ),
+        ),
+      ),
     );
   }
 }

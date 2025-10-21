@@ -701,12 +701,12 @@ class _PodcastListScreenState extends State<PodcastListScreen>
   Widget _buildAIGridView() {
     return GridView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12), // Giảm padding từ 16 xuống 12
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.7,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        childAspectRatio: 0.75, // Tăng từ 0.7 lên 0.75 để có thêm không gian
+        crossAxisSpacing: 8, // Giảm từ 12 xuống 8
+        mainAxisSpacing: 8, // Giảm từ 12 xuống 8
       ),
       itemCount: _aiRecommendations.length,
       itemBuilder: (context, index) =>
@@ -745,12 +745,12 @@ class _PodcastListScreenState extends State<PodcastListScreen>
   Widget _buildGridView(PaginationResult<Podcast> data) {
     return GridView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12), // Giảm padding từ 16 xuống 12
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.7,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        childAspectRatio: 0.75, // Tăng từ 0.7 lên 0.75 để có thêm không gian
+        crossAxisSpacing: 8, // Giảm từ 12 xuống 8
+        mainAxisSpacing: 8, // Giảm từ 12 xuống 8
       ),
       itemCount: data.items.length,
       itemBuilder: (context, index) => PodcastCard(podcast: data.items[index]),

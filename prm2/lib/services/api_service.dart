@@ -1,14 +1,15 @@
-
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import 'package:prm2/models/my_subscription.dart';
-import 'package:prm2/models/payment_method.dart';
-import 'package:prm2/models/subscription_registration_response.dart';
+import '../models/my_subscription.dart';
+import '../models/payment_method.dart';
+import '../models/subscription_registration_response.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/api_result.dart';
 import '../models/creator_application.dart';
@@ -21,6 +22,7 @@ import '../models/podcast.dart';
 import '../models/pagination_result.dart';
 import '../models/podcast_category.dart';
 import '../models/podcast_recommendation.dart';
+import '../models/creator_dashboard_stats.dart';
 
 class ApiService {
   // --- CÁC URL ĐƯỢC CHUYỂN THÀNH GETTER ĐỂ TRÁNH RACE CONDITION ---
@@ -35,11 +37,14 @@ class ApiService {
   static String get _loginUrl => '$_authUrl/login';
   static String get _plansUrl => '$_userUrl/subscription-plans';
   static String get _paymentMethodsUrl => '$_userUrl/payment-methods';
-  static String get _registerSubscriptionUrl => '$_userUrl/subscriptions/register';
-  static String get _mySubscriptionUrl => '$_userUrl/subscriptions/me'; // <-- THÊM MỚI
+  static String get _registerSubscriptionUrl =>
+      '$_userUrl/subscriptions/register';
+  static String get _mySubscriptionUrl =>
+      '$_userUrl/subscriptions/me'; // <-- THÊM MỚI
   static String get _checkoutUrl => '$_userUrl/profile';
   static String get _creatorApplicationUrl => '$_userUrl/CreatorApplications';
-  static String get _creatorStatusUrl => '$_userUrl/CreatorApplications/my-status';
+  static String get _creatorStatusUrl =>
+      '$_userUrl/CreatorApplications/my-status';
   static String get _creatorPodcastsUrl => '$_baseUrl/content/creator/podcasts';
   static String get _createPodcastUrl => '$_baseUrl/content/creator/podcasts';
   static String get _userPodcastsUrl => '$_baseUrl/content/user/podcasts';
@@ -52,8 +57,9 @@ class ApiService {
 
     final headers = {
       'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',  // Bypass ngrok free tier browser warning
-      'User-Agent': 'Flutter-Client',  // Identify as non-browser for ngrok
+      'ngrok-skip-browser-warning':
+          'true', // Bypass ngrok free tier browser warning
+      'User-Agent': 'Flutter-Client', // Identify as non-browser for ngrok
     };
 
     if (token != null) {
@@ -71,11 +77,16 @@ class ApiService {
     final url = Uri.parse(_mySubscriptionUrl);
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       final jsonResponse = jsonDecode(response.body);
       if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
-        return ApiResult(isSuccess: false, message: jsonResponse['message'] ?? 'Lỗi tải thông tin gói cước');
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi tải thông tin gói cước',
+        );
       }
 
       // API này trả về object trực tiếp trong `data`
@@ -84,36 +95,54 @@ class ApiService {
         (dataJson) => MySubscription.fromJson(dataJson as Map<String, dynamic>),
       );
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}',
+      );
     }
   }
-
 
   static Future<ApiResult<List<PaymentMethod>>> getPaymentMethods() async {
     final url = Uri.parse('$_paymentMethodsUrl?status=1');
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode != 200 || !(jsonDecode(response.body)['isSuccess'] ?? false)) {
-        return ApiResult(isSuccess: false, message: jsonDecode(response.body)['message'] ?? 'Lỗi tải phương thức thanh toán');
+      if (response.statusCode != 200 ||
+          !(jsonDecode(response.body)['isSuccess'] ?? false)) {
+        return ApiResult(
+          isSuccess: false,
+          message:
+              jsonDecode(response.body)['message'] ??
+              'Lỗi tải phương thức thanh toán',
+        );
       }
 
       final jsonResponse = jsonDecode(response.body);
       final itemsList = jsonResponse['items'] as List<dynamic>?;
       if (itemsList == null) {
-        return ApiResult(isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng (key items is null).');
+        return ApiResult(
+          isSuccess: false,
+          message: 'Dữ liệu trả về không đúng định dạng (key items is null).',
+        );
       }
 
-      final methods = itemsList.map((item) => PaymentMethod.fromJson(item as Map<String, dynamic>)).toList();
+      final methods = itemsList
+          .map((item) => PaymentMethod.fromJson(item as Map<String, dynamic>))
+          .toList();
       return ApiResult(isSuccess: true, data: methods);
-
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}',
+      );
     }
   }
 
-  static Future<ApiResult<SubscriptionRegistrationResponse>> registerSubscription({
+  static Future<ApiResult<SubscriptionRegistrationResponse>>
+  registerSubscription({
     required String planId,
     required String paymentMethodId,
   }) async {
@@ -125,29 +154,34 @@ class ApiService {
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 20));
+      final response = await http
+          .post(url, headers: headers, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 20));
 
       final jsonResponse = jsonDecode(response.body);
 
       if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
-          return ApiResult(
-            isSuccess: false,
-            message: jsonResponse['message'] as String?,
-            errors: (jsonResponse['errors'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
-            errorCode: jsonResponse['errorCode'] as String?,
-          );
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] as String?,
+          errors: (jsonResponse['errors'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList(),
+          errorCode: jsonResponse['errorCode'] as String?,
+        );
       }
 
       return ApiResult.fromJson(
         jsonResponse,
-        (dataJson) => SubscriptionRegistrationResponse.fromJson(dataJson as Map<String, dynamic>),
+        (dataJson) => SubscriptionRegistrationResponse.fromJson(
+          dataJson as Map<String, dynamic>,
+        ),
       );
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Lỗi đăng ký gói: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Lỗi đăng ký gói: ${e.toString()}',
+      );
     }
   }
 
@@ -158,46 +192,54 @@ class ApiService {
     final url = Uri.parse('$_plansUrl?page=$page&pageSize=$pageSize');
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(
-          const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       final jsonResponse = jsonDecode(response.body);
 
       if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
-         return ApiResult(isSuccess: false, message: jsonResponse['message'] ?? 'Lỗi tải các gói subscription');
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi tải các gói subscription',
+        );
       }
 
       final itemsList = jsonResponse['items'] as List<dynamic>?;
       if (itemsList == null) {
         return ApiResult(
-            isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng (key items is null).');
+          isSuccess: false,
+          message: 'Dữ liệu trả về không đúng định dạng (key items is null).',
+        );
       }
 
-      final plans = itemsList.map((planJson) =>
-          SubscriptionPlan.fromJson(planJson as Map<String, dynamic>)).toList();
+      final plans = itemsList
+          .map(
+            (planJson) =>
+                SubscriptionPlan.fromJson(planJson as Map<String, dynamic>),
+          )
+          .toList();
 
-      return ApiResult(
-        isSuccess: true,
-        data: plans,
-      );
+      return ApiResult(isSuccess: true, data: plans);
     } on TimeoutException {
       return ApiResult(
-          isSuccess: false,
-          message: 'Hết thời gian yêu cầu. Vui lòng thử lại.');
+        isSuccess: false,
+        message: 'Hết thời gian yêu cầu. Vui lòng thử lại.',
+      );
     } on http.ClientException catch (e) {
-      return ApiResult(
-          isSuccess: false, message: 'Lỗi kết nối: ${e.message}');
+      return ApiResult(isSuccess: false, message: 'Lỗi kết nối: ${e.message}');
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}',
+      );
     }
   }
 
-
   // ... (các hàm còn lại giữ nguyên) ...
-  
+
   /// Create a new podcast with audio and thumbnail file upload
-  /// 
+  ///
   /// Parameters:
   /// - title: Podcast title (required, 3-200 chars)
   /// - description: Podcast description (required, 10-2000 chars)
@@ -212,15 +254,15 @@ class ApiService {
   /// - emotionCategories: List of emotion categories (optional)
   /// - topicCategories: List of topic categories (optional)
   /// - transcriptUrl: URL to transcript (optional, max 1000 chars)
-  /// 
+  ///
   /// Returns: CreatePodcastResponse with podcast ID
-  /// 
+  ///
   /// Throws: Exception if upload fails
   static Future<ApiResult> createPodcast({
     required String title,
     required String description,
     required PlatformFile audioFile,
-    dynamic thumbnailFile,  // Can be PlatformFile (web) or XFile (mobile)
+    dynamic thumbnailFile, // Can be PlatformFile (web) or XFile (mobile)
     required int duration,
     String? hostName,
     String? guestName,
@@ -235,7 +277,7 @@ class ApiService {
       print('DEBUG: Starting createPodcast');
       print('DEBUG: emotionCategories = $emotionCategories');
       print('DEBUG: topicCategories = $topicCategories');
-      
+
       final url = Uri.parse(_createPodcastUrl);
       final headers = await _getAuthHeaders();
       print('DEBUG: Headers prepared');
@@ -274,17 +316,23 @@ class ApiService {
       // Add emotion categories as individual fields (ASP.NET Form Binder expects: EmotionCategories[0]=1&EmotionCategories[1]=2)
       // This way ASP.NET Model Binder can properly deserialize to List<EmotionCategory>
       if (emotionCategories != null && emotionCategories.isNotEmpty) {
-        print('DEBUG: Adding emotion categories, count=${emotionCategories.length}');
+        print(
+          'DEBUG: Adding emotion categories, count=${emotionCategories.length}',
+        );
         for (int i = 0; i < emotionCategories.length; i++) {
           final emotion = emotionCategories[i];
-          print('DEBUG: emotion[$i] = ${emotion.name}, value = ${emotion.value}');
+          print(
+            'DEBUG: emotion[$i] = ${emotion.name}, value = ${emotion.value}',
+          );
           request.fields['EmotionCategories[$i]'] = emotion.value.toString();
         }
       }
 
       // Add topic categories as individual fields (ASP.NET Form Binder expects: TopicCategories[0]=1&TopicCategories[1]=2)
       if (topicCategories != null && topicCategories.isNotEmpty) {
-        print('DEBUG: Adding topic categories, count=${topicCategories.length}');
+        print(
+          'DEBUG: Adding topic categories, count=${topicCategories.length}',
+        );
         for (int i = 0; i < topicCategories.length; i++) {
           final topic = topicCategories[i];
           print('DEBUG: topic[$i] = ${topic.name}, value = ${topic.value}');
@@ -293,23 +341,62 @@ class ApiService {
       }
 
       // Add audio file (required)
-      // PlatformFile.bytes is pre-loaded on web, so use it directly
       try {
         print('DEBUG: About to process audio file: ${audioFile.name}');
-        final audioBytes = audioFile.bytes;
-        if (audioBytes == null || audioBytes.isEmpty) {
-          throw Exception('Audio file bytes are empty');
+
+        if (kIsWeb) {
+          // Web: Use bytes directly
+          final audioBytes = audioFile.bytes;
+          if (audioBytes == null || audioBytes.isEmpty) {
+            throw Exception('Audio file bytes are empty');
+          }
+          print(
+            'DEBUG: Web - Audio file processed successfully, size=${audioBytes.length}',
+          );
+
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'AudioFile',
+              audioBytes,
+              filename: audioFile.name,
+              contentType: MediaType('audio', 'mpeg'),
+            ),
+          );
+        } else {
+          // Mobile/Desktop: Read from file path
+          if (audioFile.path == null) {
+            throw Exception('Audio file path is null');
+          }
+
+          print(
+            'DEBUG: Mobile - Reading audio file from path: ${audioFile.path}',
+          );
+          final audioFileObj = File(audioFile.path!);
+
+          if (!audioFileObj.existsSync()) {
+            throw Exception(
+              'Audio file does not exist at path: ${audioFile.path}',
+            );
+          }
+
+          final audioBytes = await audioFileObj.readAsBytes();
+          if (audioBytes.isEmpty) {
+            throw Exception('Audio file is empty');
+          }
+
+          print(
+            'DEBUG: Mobile - Audio file processed successfully, size=${audioBytes.length}',
+          );
+
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'AudioFile',
+              audioBytes,
+              filename: audioFile.name,
+              contentType: MediaType('audio', 'mpeg'),
+            ),
+          );
         }
-        print('DEBUG: Audio file processed successfully, size=${audioBytes.length}');
-        
-        request.files.add(
-          http.MultipartFile.fromBytes(
-            'AudioFile',
-            audioBytes,
-            filename: audioFile.name,
-            contentType: MediaType('audio', 'mpeg'),
-          ),
-        );
       } catch (e) {
         print('ERROR processing audio file: $e');
         rethrow;
@@ -320,7 +407,7 @@ class ApiService {
         try {
           List<int> thumbBytes;
           String thumbFilename;
-          
+
           // Try to extract bytes from different file types
           if (thumbnailFile is PlatformFile) {
             // Web/Mobile file from file_picker
@@ -332,27 +419,38 @@ class ApiService {
             thumbFilename = thumbnailFile.name;
           } else {
             // Try dynamic approach for unknown types
-            print('DEBUG: Thumbnail type is ${thumbnailFile.runtimeType}, attempting dynamic extraction');
-            
+            print(
+              'DEBUG: Thumbnail type is ${thumbnailFile.runtimeType}, attempting dynamic extraction',
+            );
+
             // Try to call readAsBytes() dynamically
             if (thumbnailFile.readAsBytes != null) {
               thumbBytes = await thumbnailFile.readAsBytes();
             } else if (thumbnailFile.bytes != null) {
               thumbBytes = thumbnailFile.bytes ?? [];
             } else {
-              throw Exception('Cannot extract bytes from thumbnail file type: ${thumbnailFile.runtimeType}');
+              throw Exception(
+                'Cannot extract bytes from thumbnail file type: ${thumbnailFile.runtimeType}',
+              );
             }
-            
+
             // Try to get filename
-            thumbFilename = thumbnailFile.name ?? thumbnailFile.path?.split('/').last ?? 'thumbnail.jpg';
+            thumbFilename =
+                thumbnailFile.name ??
+                thumbnailFile.path?.split('/').last ??
+                'thumbnail.jpg';
           }
-          
+
           if (thumbBytes.isEmpty) {
-            print('WARNING: Thumbnail file bytes are empty, skipping thumbnail upload');
+            print(
+              'WARNING: Thumbnail file bytes are empty, skipping thumbnail upload',
+            );
             // Don't throw - allow podcast creation without thumbnail
           } else {
-            print('DEBUG: Thumbnail file processed successfully, size=${thumbBytes.length}');
-            
+            print(
+              'DEBUG: Thumbnail file processed successfully, size=${thumbBytes.length}',
+            );
+
             request.files.add(
               http.MultipartFile.fromBytes(
                 'ThumbnailFile',
@@ -364,37 +462,89 @@ class ApiService {
           }
         } catch (e) {
           print('ERROR processing thumbnail file: $e');
-          print('WARNING: Continuing without thumbnail - thumbnail is optional');
+          print(
+            'WARNING: Continuing without thumbnail - thumbnail is optional',
+          );
           // Don't rethrow - thumbnail is optional
         }
       }
 
-      // Send request
+      // Send request with extended timeout for large files
       print('DEBUG: About to send request to $_createPodcastUrl');
       print('DEBUG: Form fields keys: ${request.fields.keys.toList()}');
       print('DEBUG: Form files count: ${request.files.length}');
-      final streamedResponse = await request.send();
+
+      // Calculate timeout based on file size (1MB = 20 seconds for better stability)
+      final audioFileSize = audioFile.size;
+      final timeoutSeconds = (audioFileSize / (1024 * 1024) * 20).ceil().clamp(
+        120,
+        900,
+      ); // Min 2min, Max 15min
+      print(
+        'DEBUG: File size: ${(audioFileSize / (1024 * 1024)).toStringAsFixed(2)}MB, Timeout: ${timeoutSeconds}s',
+      );
+
+      // Send request with timeout
+      final streamedResponse = await request.send().timeout(
+        Duration(seconds: timeoutSeconds),
+      );
       print('DEBUG: Request sent successfully, awaiting response...');
-      final response = await http.Response.fromStream(streamedResponse);
+      final response = await http.Response.fromStream(
+        streamedResponse,
+      ).timeout(Duration(seconds: 60));
+
+      // Process response
+      print('DEBUG: Response status: ${response.statusCode}');
+      print('DEBUG: Response body: ${response.body}');
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        
-        // Parse response - backend returns { isSuccess, message, data: {...podcast...} }
-        return ApiResult(
-          isSuccess: true,
-          message: 'Podcast created successfully',
-          data: jsonResponse['data'] ?? jsonResponse,
-          errorCode: null,
-        );
+        try {
+          final jsonResponse = jsonDecode(response.body);
+          print('DEBUG: Parsed JSON response: $jsonResponse');
+
+          // Handle different response formats
+          if (jsonResponse is Map<String, dynamic>) {
+            return ApiResult(
+              isSuccess: true,
+              message: 'Podcast created successfully',
+              data: jsonResponse['data'] ?? jsonResponse,
+              errorCode: null,
+            );
+          } else {
+            // Response is not a Map, treat as direct data
+            return ApiResult(
+              isSuccess: true,
+              message: 'Podcast created successfully',
+              data: jsonResponse,
+              errorCode: null,
+            );
+          }
+        } catch (e) {
+          print('ERROR: Failed to parse JSON response: $e');
+          return ApiResult(
+            isSuccess: false,
+            message: 'Invalid response format from server',
+            errorCode: 'PARSE_ERROR',
+          );
+        }
       } else if (response.statusCode == 400) {
-        final jsonResponse = jsonDecode(response.body);
-        return ApiResult(
-          isSuccess: false,
-          message: jsonResponse['message'] ?? 'Validation error',
-          errors: List<String>.from(jsonResponse['errors'] ?? []),
-          errorCode: '400',
-        );
+        try {
+          final jsonResponse = jsonDecode(response.body);
+          return ApiResult(
+            isSuccess: false,
+            message: jsonResponse['message'] ?? 'Validation error',
+            errors: jsonResponse['errors'] is List
+                ? List<String>.from(jsonResponse['errors'])
+                : [],
+            errorCode: '400',
+          );
+        } catch (e) {
+          return ApiResult(
+            isSuccess: false,
+            message: 'Validation error',
+            errorCode: '400',
+          );
+        }
       } else if (response.statusCode == 401) {
         return ApiResult(
           isSuccess: false,
@@ -417,6 +567,25 @@ class ApiService {
     } catch (e, stackTrace) {
       print('ERROR: Exception in createPodcast: $e');
       print('ERROR: Stack trace: $stackTrace');
+
+      // Handle specific network errors
+      if (e.toString().contains('Connection reset by peer') ||
+          e.toString().contains('SocketException')) {
+        return ApiResult(
+          isSuccess: false,
+          message:
+              'Kết nối bị ngắt. File có thể quá lớn hoặc mạng không ổn định. Vui lòng thử lại với file nhỏ hơn.',
+          errorCode: 'NETWORK_ERROR',
+        );
+      } else if (e.toString().contains('TimeoutException')) {
+        return ApiResult(
+          isSuccess: false,
+          message:
+              'Hết thời gian upload. File quá lớn hoặc mạng chậm. Vui lòng thử lại.',
+          errorCode: 'TIMEOUT',
+        );
+      }
+
       return ApiResult(
         isSuccess: false,
         message: 'Error creating podcast: ${e.toString()}',
@@ -424,7 +593,6 @@ class ApiService {
       );
     }
   }
-
 
   static Future<ApiResult<dynamic>> register({
     required String email,
@@ -440,31 +608,39 @@ class ApiService {
       'confirmPassword': confirmPassword,
       'fullName': fullName,
       'phoneNumber': phoneNumber,
-      'otpSentChannel': 1
+      'otpSentChannel': 1,
     };
 
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-          'User-Agent': 'Flutter-Client',
-        },
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+              'User-Agent': 'Flutter-Client',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final jsonResponse = jsonDecode(response.body);
       return ApiResult.fromJson(jsonResponse, (data) => null);
     } on TimeoutException {
       return ApiResult(
-          isSuccess: false, errors: ['Request timed out. Please try again.']);
+        isSuccess: false,
+        errors: ['Request timed out. Please try again.'],
+      );
     } on http.ClientException catch (e) {
       return ApiResult(
-          isSuccess: false, errors: ['Connection error: ${e.message}']);
+        isSuccess: false,
+        errors: ['Connection error: ${e.message}'],
+      );
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          errors: ['An unexpected error occurred: ${e.toString()}']);
+      return ApiResult(
+        isSuccess: false,
+        errors: ['An unexpected error occurred: ${e.toString()}'],
+      );
     }
   }
 
@@ -481,15 +657,17 @@ class ApiService {
     };
 
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-          'User-Agent': 'Flutter-Client',
-        },
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+              'User-Agent': 'Flutter-Client',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final jsonResponse = jsonDecode(response.body);
       return ApiResult.fromJson(jsonResponse, (data) => null);
@@ -497,10 +675,14 @@ class ApiService {
       return ApiResult(isSuccess: false, message: 'Request timed out.');
     } on http.ClientException catch (e) {
       return ApiResult(
-          isSuccess: false, message: 'Connection error: ${e.message}');
+        isSuccess: false,
+        message: 'Connection error: ${e.message}',
+      );
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'An unexpected error occurred: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'An unexpected error occurred: ${e.toString()}',
+      );
     }
   }
 
@@ -509,37 +691,39 @@ class ApiService {
     required String password,
   }) async {
     final url = Uri.parse(_loginUrl);
-    final body = {
-      'email': email,
-      'password': password,
-      'grantType': 0,
-    };
+    final body = {'email': email, 'password': password, 'grantType': 0};
 
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-          'User-Agent': 'Flutter-Client',
-        },
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+              'User-Agent': 'Flutter-Client',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final jsonResponse = jsonDecode(response.body);
 
       return ApiResult.fromJson(
         jsonResponse,
-            (dataJson) => LoginData.fromJson(dataJson as Map<String, dynamic>),
+        (dataJson) => LoginData.fromJson(dataJson as Map<String, dynamic>),
       );
     } on TimeoutException {
       return ApiResult(isSuccess: false, message: 'Request timed out.');
     } on http.ClientException catch (e) {
       return ApiResult(
-          isSuccess: false, message: 'Connection error: ${e.message}');
+        isSuccess: false,
+        message: 'Connection error: ${e.message}',
+      );
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'An unexpected error occurred: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'An unexpected error occurred: ${e.toString()}',
+      );
     }
   }
 
@@ -547,37 +731,40 @@ class ApiService {
     final url = Uri.parse(_checkoutUrl);
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(
-          const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
       final jsonResponse = jsonDecode(response.body);
 
       if (response.statusCode == 401) {
         return ApiResult(
-            isSuccess: false, message: 'Phiên đăng nhập đã hết hạn.');
+          isSuccess: false,
+          message: 'Phiên đăng nhập đã hết hạn.',
+        );
       }
 
       return ApiResult.fromJson(
         jsonResponse,
-            (dataJson) =>
-            UserProfile.fromJson(jsonResponse),
+        (dataJson) => UserProfile.fromJson(jsonResponse),
       );
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'Lỗi lấy thông tin người dùng: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Lỗi lấy thông tin người dùng: ${e.toString()}',
+      );
     }
   }
 
   static Future<ApiResult<dynamic>> submitCreatorApplication(
-      CreatorApplication application) async {
+    CreatorApplication application,
+  ) async {
     final body = application.toJson();
     final url = Uri.parse(_creatorApplicationUrl);
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .post(url, headers: headers, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseBody = jsonDecode(response.body);
@@ -588,7 +775,8 @@ class ApiService {
         );
       } else {
         final errorBody = jsonDecode(response.body);
-        String errorMessage = 'Lỗi ${response.statusCode}. Server không phản hồi.';
+        String errorMessage =
+            'Lỗi ${response.statusCode}. Server không phản hồi.';
         if (errorBody['errors'] != null && errorBody['errors'] is Map) {
           final validationErrors = (errorBody['errors'] as Map).values
               .expand((list) => list as Iterable)
@@ -598,27 +786,34 @@ class ApiService {
         return ApiResult(isSuccess: false, message: errorMessage);
       }
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi kết nối: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Đã xảy ra lỗi kết nối: ${e.toString()}',
+      );
     }
   }
 
   static Future<ApiResult<CreatorApplicationStatus>>
-      getMyCreatorApplicationStatus() async {
+  getMyCreatorApplicationStatus() async {
     final url = Uri.parse(_creatorStatusUrl);
     try {
       final headers = await _getAuthHeaders();
-      final response =
-          await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 404) {
         return ApiResult(
-            isSuccess: false,
-            message: 'Bạn chưa nộp đơn đăng ký.',
-            errorCode: '404');
+          isSuccess: false,
+          message: 'Bạn chưa nộp đơn đăng ký.',
+          errorCode: '404',
+        );
       }
       if (response.statusCode == 401) {
         return ApiResult(
-            isSuccess: false, message: 'Phiên đăng nhập đã hết hạn.');
+          isSuccess: false,
+          message: 'Phiên đăng nhập đã hết hạn.',
+        );
       }
 
       final jsonResponse = jsonDecode(response.body);
@@ -631,16 +826,21 @@ class ApiService {
       }
 
       return ApiResult(
-          isSuccess: false, message: 'Lỗi không xác định khi lấy trạng thái.');
+        isSuccess: false,
+        message: 'Lỗi không xác định khi lấy trạng thái.',
+      );
     } catch (e) {
       return ApiResult(isSuccess: false, message: 'Lỗi: ${e.toString()}');
     }
   }
 
-  static Future<ApiResult<List<MyPost>>> getMyPosts(
-      {int page = 1, int pageSize = 20}) async {
-    final url =
-        Uri.parse('$_cmsUrl/posts/my-posts?page=$page&pageSize=$pageSize');
+  static Future<ApiResult<List<MyPost>>> getMyPosts({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final url = Uri.parse(
+      '$_cmsUrl/posts/my-posts?page=$page&pageSize=$pageSize',
+    );
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(url, headers: headers);
@@ -648,13 +848,17 @@ class ApiService {
       print("jsonResponse: $jsonResponse");
       if (response.statusCode != 200) {
         return ApiResult(
-            isSuccess: false, message: 'Lỗi ${response.statusCode}: ${jsonResponse['message']}');
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}: ${jsonResponse['message']}',
+        );
       }
 
       final itemsList = jsonResponse['posts'] as List<dynamic>?;
       if (itemsList == null) {
         return ApiResult(
-            isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng.');
+          isSuccess: false,
+          message: 'Dữ liệu trả về không đúng định dạng.',
+        );
       }
 
       final posts = itemsList.map((p) => MyPost.fromJson(p)).toList();
@@ -670,16 +874,18 @@ class ApiService {
     int page = 1,
     int pageSize = 20,
   }) async {
-    final url = Uri.parse('$_creatorPodcastsUrl/my-podcasts?page=$page&pageSize=$pageSize');
-    
+    final url = Uri.parse(
+      '$_creatorPodcastsUrl/my-podcasts?page=$page&pageSize=$pageSize',
+    );
+
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(url, headers: headers);
-      
+
       print('[getMyPodcasts] Status: ${response.statusCode}');
       print('[getMyPodcasts] URL: $url');
       print('[getMyPodcasts] Body: ${response.body}');
-      
+
       if (response.statusCode == 404) {
         return PaginationResult<Podcast>(
           currentPage: page,
@@ -694,7 +900,7 @@ class ApiService {
           errorCode: '404',
         );
       }
-      
+
       if (response.statusCode != 200) {
         return PaginationResult<Podcast>(
           currentPage: page,
@@ -711,7 +917,7 @@ class ApiService {
       }
 
       final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
-      
+
       // Backend returns: { podcasts: [...], totalCount, page, pageSize }
       final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
       if (podcastsList == null) {
@@ -731,7 +937,7 @@ class ApiService {
       final podcasts = podcastsList
           .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
           .toList();
-      
+
       final totalCount = jsonResponse['totalCount'] as int? ?? 0;
       final totalPages = (totalCount / pageSize).ceil();
 
@@ -786,11 +992,15 @@ class ApiService {
       if (seriesName != null && seriesName.isNotEmpty) 'seriesName': seriesName,
     };
 
-    final url = Uri.parse(_userPodcastsUrl).replace(queryParameters: queryParams);
+    final url = Uri.parse(
+      _userPodcastsUrl,
+    ).replace(queryParameters: queryParams);
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
         return PaginationResult<Podcast>(
@@ -807,7 +1017,7 @@ class ApiService {
       }
 
       final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
-      
+
       // Parse response with correct structure: { podcasts: [...], totalCount, page, pageSize }
       final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
       if (podcastsList == null) {
@@ -827,7 +1037,7 @@ class ApiService {
       final podcasts = podcastsList
           .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
           .toList();
-      
+
       final totalCount = jsonResponse['totalCount'] as int? ?? 0;
       final totalPages = (totalCount / pageSize).ceil();
 
@@ -862,11 +1072,15 @@ class ApiService {
     int page = 1,
     int pageSize = 10,
   }) async {
-    final url = Uri.parse('$_userPodcastsUrl/trending?page=$page&pageSize=$pageSize');
+    final url = Uri.parse(
+      '$_userPodcastsUrl/trending?page=$page&pageSize=$pageSize',
+    );
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
         return PaginationResult<Podcast>(
@@ -883,7 +1097,7 @@ class ApiService {
       }
 
       final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
-      
+
       // Parse response with correct structure: { podcasts: [...], totalCount, page, pageSize }
       final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
       if (podcastsList == null) {
@@ -903,7 +1117,7 @@ class ApiService {
       final podcasts = podcastsList
           .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
           .toList();
-      
+
       final totalCount = jsonResponse['totalCount'] as int? ?? 0;
       final totalPages = (totalCount / pageSize).ceil();
 
@@ -938,11 +1152,15 @@ class ApiService {
     int page = 1,
     int pageSize = 10,
   }) async {
-    final url = Uri.parse('$_userPodcastsUrl/latest?page=$page&pageSize=$pageSize');
+    final url = Uri.parse(
+      '$_userPodcastsUrl/latest?page=$page&pageSize=$pageSize',
+    );
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
         return PaginationResult<Podcast>(
@@ -959,7 +1177,7 @@ class ApiService {
       }
 
       final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
-      
+
       // Parse response with correct structure: { podcasts: [...], totalCount, page, pageSize }
       final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
       if (podcastsList == null) {
@@ -979,7 +1197,7 @@ class ApiService {
       final podcasts = podcastsList
           .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
           .toList();
-      
+
       final totalCount = jsonResponse['totalCount'] as int? ?? 0;
       final totalPages = (totalCount / pageSize).ceil();
 
@@ -1015,7 +1233,9 @@ class ApiService {
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
         return ApiResult(isSuccess: false, message: 'Không tìm thấy podcast');
@@ -1034,15 +1254,29 @@ class ApiService {
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      print('🔍 DEBUG: Getting creator podcast by ID: $id');
+      print('🔍 DEBUG: URL: $url');
+
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      print(
+        '🔍 DEBUG: Creator podcast response status: ${response.statusCode}',
+      );
+      print('🔍 DEBUG: Creator podcast response body: ${response.body}');
 
       if (response.statusCode != 200) {
-        return ApiResult(isSuccess: false, message: 'Không tìm thấy podcast (Status: ${response.statusCode})');
+        return ApiResult(
+          isSuccess: false,
+          message: 'Không tìm thấy podcast (Status: ${response.statusCode})',
+        );
       }
 
       final jsonResponse = jsonDecode(response.body);
       return ApiResult(isSuccess: true, data: Podcast.fromJson(jsonResponse));
     } catch (e) {
+      print('🔍 DEBUG: Error getting creator podcast: $e');
       return ApiResult(isSuccess: false, message: 'Lỗi: ${e.toString()}');
     }
   }
@@ -1053,11 +1287,15 @@ class ApiService {
     int page = 1,
     int pageSize = 10,
   }) async {
-    final url = Uri.parse('$_userPodcastsUrl/search?keyword=$keyword&page=$page&pageSize=$pageSize');
+    final url = Uri.parse(
+      '$_userPodcastsUrl/search?keyword=$keyword&page=$page&pageSize=$pageSize',
+    );
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
         return PaginationResult<Podcast>(
@@ -1074,7 +1312,7 @@ class ApiService {
       }
 
       final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
-      
+
       // Parse response with correct structure: { podcasts: [...], totalCount, page, pageSize }
       final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
       if (podcastsList == null) {
@@ -1094,7 +1332,7 @@ class ApiService {
       final podcasts = podcastsList
           .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
           .toList();
-      
+
       final totalCount = jsonResponse['totalCount'] as int? ?? 0;
       final totalPages = (totalCount / pageSize).ceil();
 
@@ -1126,27 +1364,45 @@ class ApiService {
 
   /// Increment view count
   static Future<void> incrementPodcastView(String podcastId) async {
-    final url = Uri.parse('$_userPodcastsUrl/$podcastId/view');
+    final url = Uri.parse('$_userPodcastsUrl/$podcastId/views');
     try {
       final headers = await _getAuthHeaders();
-      await http.post(url, headers: headers).timeout(const Duration(seconds: 5));
+      print('🔍 DEBUG: Increment view URL: $url');
+      print('🔍 DEBUG: Headers: $headers');
+
+      final response = await http
+          .post(url, headers: headers)
+          .timeout(const Duration(seconds: 5));
+
+      print('🔍 DEBUG: View response status: ${response.statusCode}');
+      print('🔍 DEBUG: View response body: ${response.body}');
     } catch (e) {
+      print('🔍 DEBUG: View increment error: $e');
       // Silent fail - không cần thông báo lỗi cho user
     }
   }
 
   /// Toggle like podcast (like/unlike)
   static Future<ApiResult<bool>> toggleLikePodcast(String podcastId) async {
-    final url = Uri.parse('$_userPodcastsUrl/$podcastId/like');
+    final url = Uri.parse('$_userPodcastsUrl/$podcastId/likes');
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.post(url, headers: headers).timeout(const Duration(seconds: 10));
+      print('🔍 DEBUG: Toggle like URL: $url');
+      print('🔍 DEBUG: Headers: $headers');
+
+      final response = await http
+          .post(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      print('🔍 DEBUG: Response status: ${response.statusCode}');
+      print('🔍 DEBUG: Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        // Backend returns { likes: number } format like Next.js
         return ApiResult<bool>(
           isSuccess: true,
-          data: data['isLiked'] ?? true,
+          data: data['isLiked'] ?? true, // Keep this for UI state
           message: data['message'] ?? 'Success',
         );
       } else {
@@ -1156,10 +1412,7 @@ class ApiService {
         );
       }
     } catch (e) {
-      return ApiResult<bool>(
-        isSuccess: false,
-        message: 'Lỗi: ${e.toString()}',
-      );
+      return ApiResult<bool>(isSuccess: false, message: 'Lỗi: ${e.toString()}');
     }
   }
 
@@ -1168,7 +1421,9 @@ class ApiService {
     final url = Uri.parse('$_userPodcastsUrl/$podcastId/liked');
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -1177,6 +1432,65 @@ class ApiService {
       return false;
     } catch (e) {
       return false;
+    }
+  }
+
+  /// Get creator dashboard statistics
+  static Future<ApiResult<CreatorDashboardStats>>
+  getCreatorDashboardStats() async {
+    final url = Uri.parse('$_creatorPodcastsUrl/dashboard');
+
+    try {
+      final headers = await _getAuthHeaders();
+      print('📊 DEBUG: Getting creator dashboard stats from: $url');
+
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      print(
+        '📊 DEBUG: Dashboard stats response status: ${response.statusCode}',
+      );
+      print('📊 DEBUG: Dashboard stats response body: ${response.body}');
+
+      if (response.statusCode != 200) {
+        return ApiResult<CreatorDashboardStats>(
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode} khi lấy thống kê dashboard',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+
+      // Check if response has isSuccess field
+      if (jsonResponse is Map<String, dynamic>) {
+        if (jsonResponse.containsKey('isSuccess')) {
+          return ApiResult.fromJson(
+            jsonResponse,
+            (dataJson) => CreatorDashboardStats.fromJson(
+              dataJson as Map<String, dynamic>,
+            ),
+          );
+        } else {
+          // Direct data response (no wrapper)
+          return ApiResult(
+            isSuccess: true,
+            data: CreatorDashboardStats.fromJson(jsonResponse),
+            message: 'Success',
+          );
+        }
+      } else {
+        return ApiResult<CreatorDashboardStats>(
+          isSuccess: false,
+          message: 'Invalid response format',
+        );
+      }
+    } catch (e) {
+      print('📊 DEBUG: Dashboard stats error: $e');
+      return ApiResult<CreatorDashboardStats>(
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
     }
   }
 
@@ -1193,17 +1507,21 @@ class ApiService {
       queryParams['includeListened'] = includeListened.toString();
     }
 
-    final url = Uri.parse('$_recommendationsUrl/me').replace(
-      queryParameters: queryParams.isNotEmpty ? queryParams : null,
-    );
+    final url = Uri.parse(
+      '$_recommendationsUrl/me',
+    ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
     print('🤖 DEBUG: Calling AI recommendations API: $url');
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
-      print('🤖 DEBUG: AI recommendations response status: ${response.statusCode}');
+      print(
+        '🤖 DEBUG: AI recommendations response status: ${response.statusCode}',
+      );
       print('🤖 DEBUG: AI recommendations response body: ${response.body}');
 
       if (response.statusCode != 200) {
@@ -1216,7 +1534,9 @@ class ApiService {
       final jsonResponse = jsonDecode(response.body);
       return ApiResult.fromJson(
         jsonResponse,
-        (dataJson) => PodcastRecommendationResponse.fromJson(dataJson as Map<String, dynamic>),
+        (dataJson) => PodcastRecommendationResponse.fromJson(
+          dataJson as Map<String, dynamic>,
+        ),
       );
     } catch (e) {
       print('🤖 DEBUG: AI recommendations error: $e');
@@ -1226,5 +1546,4 @@ class ApiService {
       );
     }
   }
-
 }

@@ -1,26 +1,55 @@
-// File: screens/register_screen.dart (PHIÊN BẢN ĐÃ SỬA LỖI)
+// File: screens/register_screen.dart (PHIÊN BẢN LIQUID GLASS)
 
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import '../components/register_form.dart';
-
-// Mô phỏng màu nền nhạt từ hình ảnh (phải giống LoginScreen)
-const Color kLightBeigeBackground = Color(0xFFFBF8F5);
+import '../utils/app_colors.dart';
 
 class RegisterScreen extends StatelessWidget {
-  // THAY ĐỔI 1: Xóa callback khỏi constructor
   const RegisterScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kLightBeigeBackground,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            // Đảm bảo nội dung có thể cuộn khi bàn phím xuất hiện
-            padding: const EdgeInsets.symmetric(vertical: 40.0),
-            // THAY ĐỔI 2: Gọi RegisterForm mà không cần tham số
-            child: RegisterForm(),
+      backgroundColor: kBackgroundColor,
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [kBackgroundColor, kSurfaceColor],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                vertical: 40.0,
+                horizontal: 20.0,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: kGlassBackground,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: kGlassBorder, width: 0.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: kGlassShadow,
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: const RegisterForm(),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

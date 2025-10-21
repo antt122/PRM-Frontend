@@ -3,7 +3,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:just_audio/just_audio.dart';
-import 'dart:io';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../models/podcast_category.dart';
@@ -319,6 +318,12 @@ class _PodcastUploadScreenState extends State<PodcastUploadScreen> {
     });
 
     try {
+      // Show progress dialog for large files
+      if (_audioFile != null && _audioFile!.size > 10 * 1024 * 1024) {
+        // > 10MB
+        _showUploadProgressDialog();
+      }
+
       final result = await ApiService.createPodcast(
         title: _titleController.text,
         description: _descriptionController.text,
@@ -345,6 +350,11 @@ class _PodcastUploadScreenState extends State<PodcastUploadScreen> {
             : null,
       );
 
+      // Close progress dialog if it was shown
+      if (_audioFile != null && _audioFile!.size > 10 * 1024 * 1024) {
+        Navigator.of(context).pop(); // Close progress dialog
+      }
+
       if (result.isSuccess) {
         _showSuccess('Podcast tạo thành công!');
         // Navigate back
@@ -359,6 +369,10 @@ class _PodcastUploadScreenState extends State<PodcastUploadScreen> {
         _showError(result.message ?? 'Lỗi tạo podcast');
       }
     } catch (e) {
+      // Close progress dialog if it was shown
+      if (_audioFile != null && _audioFile!.size > 10 * 1024 * 1024) {
+        Navigator.of(context).pop(); // Close progress dialog
+      }
       _showError('Lỗi: $e');
     } finally {
       if (mounted) {
@@ -367,6 +381,53 @@ class _PodcastUploadScreenState extends State<PodcastUploadScreen> {
         });
       }
     }
+  }
+
+  /// Show upload progress dialog for large files
+  void _showUploadProgressDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('📤 Đang upload podcast...'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'File size: ${(_audioFile!.size / (1024 * 1024)).toStringAsFixed(2)} MB',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Vui lòng đợi, không tắt app...',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Timeout: ${((_audioFile!.size / (1024 * 1024)) * 20).ceil().clamp(120, 900)}s',
+              style: TextStyle(color: Colors.orange.shade600, fontSize: 12),
+            ),
+            if (_audioFile!.size > 20 * 1024 * 1024) // > 20MB
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: const Text(
+                  '⚠️ File lớn, có thể mất vài phút để upload',
+                  style: TextStyle(fontSize: 11, color: Colors.orange),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showError(String message) {
@@ -595,7 +656,15 @@ class _PodcastUploadScreenState extends State<PodcastUploadScreen> {
                   .map((emotion) {
                     final isSelected = _selectedEmotions.contains(emotion);
                     return FilterChip(
-                      label: Text(emotion.displayName),
+                      label: Text(
+                        emotion.displayName,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : kPrimaryTextColor,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
                       selected: isSelected,
                       onSelected: (_) {
                         setState(() {
@@ -606,17 +675,11 @@ class _PodcastUploadScreenState extends State<PodcastUploadScreen> {
                           }
                         });
                       },
-                      backgroundColor: kHighlightColor,
+                      backgroundColor: kSurfaceColor.withOpacity(0.3),
                       selectedColor: kAccentColor,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : kPrimaryTextColor,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
                       side: BorderSide(
-                        color: isSelected ? kAccentColor : kInputBorderColor,
-                        width: 1.5,
+                        color: isSelected ? kAccentColor : kGlassBorder,
+                        width: 1,
                       ),
                     );
                   })
@@ -640,7 +703,15 @@ class _PodcastUploadScreenState extends State<PodcastUploadScreen> {
                   .map((topic) {
                     final isSelected = _selectedTopics.contains(topic);
                     return FilterChip(
-                      label: Text(topic.displayName),
+                      label: Text(
+                        topic.displayName,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : kPrimaryTextColor,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
                       selected: isSelected,
                       onSelected: (_) {
                         setState(() {
@@ -651,17 +722,11 @@ class _PodcastUploadScreenState extends State<PodcastUploadScreen> {
                           }
                         });
                       },
-                      backgroundColor: kHighlightColor,
+                      backgroundColor: kSurfaceColor.withOpacity(0.3),
                       selectedColor: kAccentColor,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : kPrimaryTextColor,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
                       side: BorderSide(
-                        color: isSelected ? kAccentColor : kInputBorderColor,
-                        width: 1.5,
+                        color: isSelected ? kAccentColor : kGlassBorder,
+                        width: 1,
                       ),
                     );
                   })
