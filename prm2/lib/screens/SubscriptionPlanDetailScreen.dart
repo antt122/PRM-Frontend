@@ -203,6 +203,7 @@ class _PlanDetailCard extends StatelessWidget {
     );
   }
 
+  // --- THÊM HELPER MỚI ĐỂ XỬ LÝ STATUS ---
   // -----------------------------------------------------------
 
   @override
@@ -220,15 +221,14 @@ class _PlanDetailCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(plan.description ?? 'Không có mô tả', style: const TextStyle(fontSize: 16, color: kAdminSecondaryTextColor)),
           const SizedBox(height: 16),
-          Chip(
-            label: Text(plan.isActive ? 'Đang hoạt động' : 'Không hoạt động'),
-            backgroundColor: (plan.isActive ? Colors.green : Colors.red).withOpacity(0.2),
-            labelStyle: TextStyle(color: plan.isActive ? Colors.green : Colors.red, fontWeight: FontWeight.bold),
-          ),
+
+          // --- THAY ĐỔI: SỬ DỤNG HELPER MỚI VỚI plan.status ---
+
           const Divider(height: 32, color: kAdminInputBorderColor),
 
           _buildSectionHeader('Thông tin chung'),
           _buildInfoRow('Tên mã', plan.name),
+          _buildInfoRow('Trạng thái', plan.status),
           _buildInfoRow('Giá tiền', plan.formattedAmount),
           _buildInfoRow('Tiền tệ', plan.currency),
           _buildInfoRow('Chu kỳ', '${plan.billingPeriodCount} ${plan.billingPeriodUnitName}'),

@@ -49,13 +49,11 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
     _amountController = TextEditingController(text: widget.initialPlan.amount.toString());
     _trialDaysController = TextEditingController(text: widget.initialPlan.trialDays?.toString() ?? '0');
 
-    // --- SỬA LỖI TẠI ĐÂY ---
-    // 'widget.initialPlan' không có 'status', nó có 'isActive' (kiểu bool)
-    // Chuyển đổi 'isActive' (bool) sang 'status' (dưới dạng String)
-    // (Giả sử 1 = Active, 0 = Inactive)
-    String initialStatusString = widget.initialPlan.isActive ? '1' : '0';
-    _statusController = TextEditingController(text: initialStatusString);
-    // -----------------------
+    // --- THAY ĐỔI: SỬ DỤNG 'status' (STRING) TỪ MODEL MỚI ---
+    // Model 'SubscriptionPlan' (widget.initialPlan) đã được cập nhật
+    // để sử dụng 'status' (kiểu String) thay vì 'isActive' (kiểu bool).
+    _statusController = TextEditingController(text: widget.initialPlan.status);
+    // ----------------------------------------------------
 
     // Khởi tạo giá trị Dropdown
     _selectedBillingUnit = widget.initialPlan.billingPeriodUnit;
@@ -96,7 +94,9 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
       amount: double.tryParse(_amountController.text.trim()),
       // Chuyển từ Text sang int?
       trialDays: int.tryParse(_trialDaysController.text.trim()),
-      // Chuyển từ Text sang int?
+
+      // --- THAY ĐỔI: API có thể vẫn mong đợi INT cho 'status' ---
+      // (Nếu API của bạn mong đợi String, hãy đổi thành: _statusController.text.trim())
       status: int.tryParse(_statusController.text.trim()),
     );
 
@@ -115,6 +115,8 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
 
   @override
   Widget build(BuildContext context) {
+    // (Lưu ý: Yêu cầu về màu sắc (xanh, đỏ, vàng) không áp dụng cho
+    // màn hình Form này, nó chỉ áp dụng cho màn hình hiển thị/danh sách)
     return Scaffold(
       appBar: AppBar(
         title: Text('Chỉnh sửa: ${widget.initialPlan.displayName}'),
@@ -207,15 +209,15 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- status (int) ---
+            // --- status (int/String) ---
             TextFormField(
               controller: _statusController,
               decoration: const InputDecoration(
                   labelText: 'Trạng thái (Status)',
-                  hintText: '0=Inactive, 1=Active, 3=Pending...'
+                  hintText: 'active, inactive, pending...' // Gợi ý bằng chữ
               ),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              // keyboardType: TextInputType.number, // Xóa dòng này
+              // inputFormatters: [FilteringTextInputFormatter.digitsOnly], // Xóa dòng này
               validator: (v) => (v == null || v.isEmpty) ? 'Không được để trống' : null,
             ),
             const SizedBox(height: 32),
