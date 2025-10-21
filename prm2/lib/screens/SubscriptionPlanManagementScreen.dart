@@ -109,7 +109,8 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
               // thì tải lại danh sách
               if (result == true) {
                 _fetchPlans();
-              }            },
+              }
+              },
           ),
         ],
       ),

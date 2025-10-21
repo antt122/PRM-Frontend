@@ -382,7 +382,6 @@ class ApiService {
     }
   }
 
-
   Future<ApiResult<dynamic>> approveApplication({required String applicationId, String? notes}) async {
     final uri = Uri.parse('$_creatorApplicationsUrl/$applicationId/approve');
     final body = jsonEncode({'applicationId': applicationId, 'notes': notes});
@@ -414,6 +413,7 @@ class ApiService {
       return ApiResult(isSuccess: false, message: e.toString());
     }
   }
+
   Future<ApiResult<PaginatedResult<Subscription>>> getSubscriptions(
       SubscriptionFilters filters,
       ) async {
@@ -589,7 +589,7 @@ class ApiService {
 
       final jsonResponse = json.decode(response.body);
 
-      if (response.statusCode == 201 && jsonResponse['isSuccess'] == true) {
+      if (response.statusCode == 200 && jsonResponse['isSuccess'] == true) {
         return ApiResult.fromJson(
           jsonResponse,
               (data) => SubscriptionPlan.fromJson(data as Map<String, dynamic>),
