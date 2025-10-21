@@ -1,32 +1,41 @@
-// File: main.dart (PHIÊN BẢN MỚI, ĐƠN GIẢN HÓA)
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'screens/splash_screen.dart'; // Import màn hình Splash mới
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:prm2/screens/LoginScreen.dart';
+import 'package:prm2/utils/AppTheme.dart';
+
 
 Future<void> main() async {
-  // Load the .env file
+  // Đảm bảo các binding được khởi tạo trước khi chạy app
+  WidgetsFlutterBinding.ensureInitialized();
+  // Tải các biến môi trường từ file .env
   await dotenv.load(fileName: ".env");
-  runApp(const MyApp());
+
+  runApp(
+    // Bọc toàn bộ ứng dụng trong ProviderScope để Riverpod hoạt động
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
 }
 
-// Chuyển lại thành StatelessWidget vì không cần quản lý trạng thái nữa
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Admin Dashboard', // Đặt tên phù hợp cho ứng dụng quản lý
       debugShowCheckedModeBanner: false,
-      title: 'Social Network Demo',
-      // Thiết lập Theme chung với tông màu nâu/beige
-      theme: ThemeData(
-        fontFamily: 'Inter',
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF8B6B3E)),
-        useMaterial3: true,
-      ),
-      // Màn hình bắt đầu bây giờ là SplashScreen
-      home: const SplashScreen(),
+      // Sử dụng theme đã được định nghĩa
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark, // Mặc định là theme tối
+      // Màn hình khởi đầu là LoginScreen
+      home: const LoginScreen(),
     );
   }
 }
+
