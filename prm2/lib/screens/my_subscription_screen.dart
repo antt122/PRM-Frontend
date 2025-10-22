@@ -67,11 +67,11 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
             end: Alignment.bottomCenter,
             colors: [kBackgroundColor, kSurfaceColor],
           ),
-        ),
-        child: FutureBuilder<ApiResult<MySubscription>>(
-          future: _subscriptionFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+      ),
+      child: FutureBuilder<ApiResult<MySubscription>>(
+        future: _subscriptionFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
@@ -95,7 +95,7 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
             if (!snapshot.hasData ||
                 !snapshot.data!.isSuccess ||
                 snapshot.data!.data == null) {
-              return Center(
+            return Center(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: BackdropFilter(
@@ -130,10 +130,10 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                     ),
                   ),
                 ),
-              );
-            }
+            );
+          }
 
-            final sub = snapshot.data!.data!;
+          final sub = snapshot.data!.data!;
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
               child: ClipRRect(
@@ -153,7 +153,7 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                         ),
                       ],
                     ),
-                    child: Padding(
+              child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,9 +341,9 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                                   width: 1,
                                 ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                                   Text(
                                     'Thông tin hủy đăng ký',
                                     style: AppFonts.title3.copyWith(
@@ -351,7 +351,7 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
+                    const SizedBox(height: 8),
                                   if (sub.cancelAt != null)
                                     _buildInfoRow(
                                       'Hủy vào',
@@ -379,11 +379,11 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                         ],
                       ),
                     ),
-                  ),
                 ),
               ),
-            );
-          },
+            ),
+          );
+        },
         ),
       ),
     );
@@ -399,7 +399,7 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        children: [
                 Text(
                   label,
                   style: AppFonts.caption1.copyWith(color: kSecondaryTextColor),

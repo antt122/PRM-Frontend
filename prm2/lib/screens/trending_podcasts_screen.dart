@@ -351,6 +351,7 @@ class _TrendingPodcastsScreenState extends State<TrendingPodcastsScreen> {
         crossAxisSpacing: 6,
         mainAxisSpacing: 6,
       ),
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _trendingPodcasts!.items.length,
       itemBuilder: (context, index) =>
           PodcastCard(podcast: _trendingPodcasts!.items[index]),
@@ -360,6 +361,7 @@ class _TrendingPodcastsScreenState extends State<TrendingPodcastsScreen> {
   Widget _buildListView() {
     return ListView.builder(
       controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _trendingPodcasts!.items.length,
       itemBuilder: (context, index) =>
           PodcastListItem(podcast: _trendingPodcasts!.items[index]),

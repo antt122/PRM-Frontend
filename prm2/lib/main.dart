@@ -138,7 +138,6 @@ class _MyAppState extends State<MyApp> {
         ),
         home: const SplashScreen(),
         routes: {
-          '/': (context) => const HomeScreen(),
           '/search': (context) => const SearchPodcastsScreen(),
           '/my-subscription': (context) => const MySubscriptionScreen(),
         },

@@ -523,6 +523,7 @@ class _AIRecommendationsScreenState extends State<AIRecommendationsScreen> {
         crossAxisSpacing: 6,
         mainAxisSpacing: 6,
       ),
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _aiRecommendations.length,
       itemBuilder: (context, index) =>
           PodcastCard(podcast: _aiRecommendations[index]),
@@ -531,6 +532,7 @@ class _AIRecommendationsScreenState extends State<AIRecommendationsScreen> {
 
   Widget _buildListView() {
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _aiRecommendations.length,
       itemBuilder: (context, index) =>
           PodcastListItem(podcast: _aiRecommendations[index]),

@@ -4,6 +4,7 @@ import '../screens/my_subscription_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/creator_dashboard_screen.dart';
 import '../screens/creator_application_screen.dart';
+import '../screens/application_status_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 
@@ -20,6 +21,7 @@ class _AppDrawerState extends State<AppDrawer> {
   bool _isLoading = true;
   String _userName = 'User';
   String _userEmail = '';
+  String _creatorApplicationStatus = '';
 
   @override
   void initState() {
@@ -46,6 +48,7 @@ class _AppDrawerState extends State<AppDrawer> {
         final status = creatorResult.data!.status.toLowerCase();
         setState(() {
           _isContentCreator = (status == 'approved');
+          _creatorApplicationStatus = status;
         });
       }
 
@@ -73,6 +76,7 @@ class _AppDrawerState extends State<AppDrawer> {
 
   // Hàm xử lý đăng xuất sử dụng AuthService
   Future<void> _logout(BuildContext context) async {
+    // Manual logout: no session expired popup
     await AuthService.instance.logout();
   }
 
@@ -324,6 +328,59 @@ class _AppDrawerState extends State<AppDrawer> {
                                   const CreatorApplicationScreen(),
                             ),
                           );
+                        },
+                      ),
+
+                    // ⚠️ NEW: "Xem trạng thái đơn đăng ký" - Show if user has submitted application
+                    if (_creatorApplicationStatus.isNotEmpty &&
+                        _creatorApplicationStatus != 'approved')
+                      ListTile(
+                        leading: const Icon(
+                          Icons.assignment_outlined,
+                          color: Colors.white70,
+                        ),
+                        title: const Text(
+                          'Trạng thái đơn đăng ký',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          'Xem chi tiết đơn đăng ký',
+                          style: TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
+                        onTap: () async {
+                          // Capture root navigator before closing the drawer
+                          final rootNavigator = Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          );
+                          // Close the drawer first
+                          Navigator.pop(context);
+                          // Allow drawer close animation to finish
+                          await Future.delayed(
+                            const Duration(milliseconds: 150),
+                          );
+
+                          // Load application status
+                          final result =
+                              await ApiService.getMyCreatorApplicationStatus();
+
+                          if (result.isSuccess && result.data != null) {
+                            rootNavigator.push(
+                              MaterialPageRoute(
+                                builder: (ctx) => ApplicationStatusScreen(
+                                  status: result.data!,
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Không thể tải thông tin đơn đăng ký',
+                                ),
+                              ),
+                            );
+                          }
                         },
                       ),
 

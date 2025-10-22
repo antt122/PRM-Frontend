@@ -18,7 +18,8 @@ class AuthService {
   }
 
   /// Handle 401 Unauthorized - logout and redirect to login
-  Future<void> handleUnauthorized() async {
+  /// showSessionExpired: controls whether to show the "session expired" message (default: true)
+  Future<void> handleUnauthorized({bool showSessionExpired = true}) async {
     print('🔒 AuthService: Handling 401 Unauthorized');
 
     try {
@@ -33,16 +34,16 @@ class AuthService {
       await prefs.clear();
 
       // Navigate to login screen
-      _navigateToLogin();
+      _navigateToLogin(showSessionExpired: showSessionExpired);
     } catch (e) {
       print('❌ AuthService: Error handling unauthorized: $e');
       // Even if there's an error, still try to navigate
-      _navigateToLogin();
+      _navigateToLogin(showSessionExpired: showSessionExpired);
     }
   }
 
   /// Navigate to login screen with session expired message
-  void _navigateToLogin() {
+  void _navigateToLogin({bool showSessionExpired = true}) {
     if (_navigatorKey?.currentState != null) {
       print('🚀 AuthService: Navigating to login screen');
 
@@ -53,9 +54,11 @@ class AuthService {
       );
 
       // Show session expired message after navigation
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showSessionExpiredMessage();
-      });
+      if (showSessionExpired) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showSessionExpiredMessage();
+        });
+      }
     } else {
       print('❌ AuthService: Navigator not available');
     }
@@ -66,12 +69,8 @@ class AuthService {
     if (_navigatorKey?.currentContext != null) {
       ScaffoldMessenger.of(_navigatorKey!.currentContext!).showSnackBar(
         SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.warning, color: Colors.white),
-              SizedBox(width: 8),
-              Text('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'),
-            ],
+          content: const Text(
+            'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
           ),
           backgroundColor: Colors.orange.shade600,
           duration: const Duration(seconds: 4),
@@ -90,7 +89,7 @@ class AuthService {
   /// Logout user manually
   Future<void> logout() async {
     print('🔒 AuthService: Manual logout');
-    await handleUnauthorized();
+    await handleUnauthorized(showSessionExpired: false);
   }
 
   /// Force stop audio player

@@ -493,6 +493,7 @@ class _SearchPodcastsScreenState extends State<SearchPodcastsScreen> {
         crossAxisSpacing: 6,
         mainAxisSpacing: 6,
       ),
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _searchResults!.items.length,
       itemBuilder: (context, index) =>
           PodcastCard(podcast: _searchResults!.items[index]),
@@ -502,6 +503,7 @@ class _SearchPodcastsScreenState extends State<SearchPodcastsScreen> {
   Widget _buildListView() {
     return ListView.builder(
       controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _searchResults!.items.length,
       itemBuilder: (context, index) =>
           PodcastListItem(podcast: _searchResults!.items[index]),
