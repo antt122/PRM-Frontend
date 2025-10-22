@@ -205,8 +205,6 @@
               ),
               const SizedBox(height: 4),
               Text('Tên mã: ${plan.name}', style: const TextStyle(color: kAdminSecondaryTextColor)),
-              const SizedBox(height: 4),
-              Text('Trạng thái: ${plan.status}', style: const TextStyle(color: kAdminSecondaryTextColor)),
               const Divider(height: 20, color: kAdminInputBorderColor),
               _buildInfoRow(Icons.price_change_outlined, '${plan.formattedAmount} / ${plan.billingPeriodUnitName}'),
               const SizedBox(height: 8),
