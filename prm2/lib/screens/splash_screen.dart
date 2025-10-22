@@ -1,7 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home_screen.dart';
+import 'main_navigation_screen.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -28,10 +27,10 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return; // Đảm bảo widget vẫn còn trên cây widget
 
     if (token != null && token.isNotEmpty) {
-      // Nếu có token, chuyển đến HomeScreen
+      // Nếu có token, chuyển đến MainNavigationScreen
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
       );
     } else {
       // Nếu không có token, chuyển đến LoginScreen

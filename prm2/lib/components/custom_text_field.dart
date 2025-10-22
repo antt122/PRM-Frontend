@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import '../utils/app_colors.dart';
+import '../utils/app_fonts.dart';
 
 // Component tái sử dụng cho các trường nhập liệu.
 class CustomTextField extends StatelessWidget {
@@ -27,44 +29,48 @@ class CustomTextField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: kPrimaryTextColor,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: AppFonts.headline.copyWith(color: kPrimaryTextColor),
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          obscureText: obscureText,
-          style: const TextStyle(color: kPrimaryTextColor),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: kPrimaryTextColor.withOpacity(0.5)),
-            filled: true,
-            fillColor: kHighlightColor,
-            contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: const BorderSide(color: kInputBorderColor, width: 1.5),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: const BorderSide(color: kInputBorderColor, width: 1.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: const BorderSide(color: kAccentColor, width: 2),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: TextFormField(
+              controller: controller,
+              maxLines: maxLines,
+              obscureText: obscureText,
+              style: AppFonts.body.copyWith(color: kPrimaryTextColor),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: AppFonts.body.copyWith(color: kSecondaryTextColor),
+                filled: true,
+                fillColor: kGlassBackground,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide(color: kGlassBorder, width: 1.5),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide(color: kGlassBorder, width: 1.5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: const BorderSide(color: kAccentColor, width: 2),
+                ),
+              ),
+              validator: (value) {
+                if (isRequired && (value == null || value.isEmpty)) {
+                  return 'Vui lòng không bỏ trống trường này.';
+                }
+                return null;
+              },
             ),
           ),
-          validator: (value) {
-            if (isRequired && (value == null || value.isEmpty)) {
-              return 'Vui lòng không bỏ trống trường này.';
-            }
-            return null;
-          },
         ),
       ],
     );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import '../utils/app_colors.dart';
+import '../utils/app_fonts.dart';
 
 class MindfulnessHighlights extends StatelessWidget {
   const MindfulnessHighlights({super.key});
@@ -8,14 +10,32 @@ class MindfulnessHighlights extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 16),
-      color: kHighlightColor,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: const [
-          _HighlightItem(Icons.headphones, 'KHOẢNH KHẮC CHÁNH NIỆM'),
-          _HighlightItem(Icons.spa, 'KHOẢNH KHẮC CHÁNH NIỆM'),
-          _HighlightItem(Icons.self_improvement, 'KHOẢNH KHẮC CHÁNH NIỆM'),
-        ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: kGlassBackground,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: kGlassBorder, width: 0.5),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: const [
+                  _HighlightItem(Icons.headphones, 'KHOẢNH KHẮC CHÁNH NIỆM'),
+                  _HighlightItem(Icons.spa, 'KHOẢNH KHẮC CHÁNH NIỆM'),
+                  _HighlightItem(
+                    Icons.self_improvement,
+                    'KHOẢNH KHẮC CHÁNH NIỆM',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -36,10 +56,10 @@ class _HighlightItem extends StatelessWidget {
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-                color: kPrimaryTextColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 12),
+            style: AppFonts.caption1.copyWith(
+              color: kPrimaryTextColor,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),

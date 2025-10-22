@@ -13,6 +13,9 @@ class MySubscription {
   final bool cancelAtPeriodEnd;
   final int renewalBehavior;
   final String renewalBehaviorName;
+  final double amount;
+  final String currency;
+  final String billingPeriodUnit;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -31,6 +34,9 @@ class MySubscription {
     required this.cancelAtPeriodEnd,
     required this.renewalBehavior,
     required this.renewalBehaviorName,
+    required this.amount,
+    required this.currency,
+    required this.billingPeriodUnit,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -46,11 +52,18 @@ class MySubscription {
       subscriptionStatusName: json['subscriptionStatusName'] as String,
       currentPeriodStart: DateTime.parse(json['currentPeriodStart'] as String),
       currentPeriodEnd: DateTime.parse(json['currentPeriodEnd'] as String),
-      cancelAt: json['cancelAt'] != null ? DateTime.tryParse(json['cancelAt']) : null,
-      canceledAt: json['canceledAt'] != null ? DateTime.tryParse(json['canceledAt']) : null,
+      cancelAt: json['cancelAt'] != null
+          ? DateTime.tryParse(json['cancelAt'])
+          : null,
+      canceledAt: json['canceledAt'] != null
+          ? DateTime.tryParse(json['canceledAt'])
+          : null,
       cancelAtPeriodEnd: json['cancelAtPeriodEnd'] as bool? ?? false,
       renewalBehavior: json['renewalBehavior'] as int? ?? 0,
       renewalBehaviorName: json['renewalBehaviorName'] as String? ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      currency: json['currency'] as String? ?? 'VND',
+      billingPeriodUnit: json['billingPeriodUnit'] as String? ?? 'Month',
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );

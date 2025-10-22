@@ -1,17 +1,13 @@
-// File: components/register_form.dart (PHIÊN BẢN HOÀN CHỈNH)
+// File: components/register_form.dart (PHIÊN BẢN LIQUID GLASS)
 
 import 'package:flutter/material.dart';
-import '../models/api_result.dart';
+import 'dart:ui';
 import '../services/api_service.dart';
 import '../screens/OtpVerificationScreen.dart';
-
-// === Các hằng số màu sắc ===
-const Color kPrimaryBrown = Color(0xFF8B6B3E);
-const Color kSecondaryBeige = Color(0xFFD6C8A6);
-const Color kInputBorderColor = Color(0xFFC4B89A);
+import '../utils/app_colors.dart';
+import '../utils/app_fonts.dart';
 
 class RegisterForm extends StatefulWidget {
-  // THAY ĐỔI 1: Xóa callback khỏi constructor
   const RegisterForm({super.key});
 
   @override
@@ -81,20 +77,23 @@ class _RegisterFormState extends State<RegisterForm> {
           MaterialPageRoute(
             builder: (context) => OtpVerificationScreen(
               email: email,
-              // THAY ĐỔI 2: Cập nhật logic sau khi xác thực OTP thành công
               onVerificationSuccess: () {
                 // Quay về trang Login sau khi OTP thành công.
-                // Chúng ta cần pop 2 lần:
-                // Lần 1: Đóng màn hình OTP
-                // Lần 2: Đóng màn hình Register để lộ ra màn hình Login bên dưới
                 Navigator.of(context).pop();
                 Navigator.of(context).pop();
 
                 // Hiển thị một thông báo trên màn hình Login để người dùng biết
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Đăng ký và xác thực thành công! Vui lòng đăng nhập.'),
-                    backgroundColor: Colors.green,
+                  SnackBar(
+                    content: Text(
+                      'Đăng ký và xác thực thành công! Vui lòng đăng nhập.',
+                      style: AppFonts.body.copyWith(color: kPrimaryTextColor),
+                    ),
+                    backgroundColor: kSuccessColor,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 );
               },
@@ -104,7 +103,10 @@ class _RegisterFormState extends State<RegisterForm> {
       }
     } else {
       setState(() {
-        _error = result.errors?.join('\n') ?? result.message ?? 'Đã xảy ra lỗi không xác định.';
+        _error =
+            result.errors?.join('\n') ??
+            result.message ??
+            'Đã xảy ra lỗi không xác định.';
       });
     }
 
@@ -117,54 +119,65 @@ class _RegisterFormState extends State<RegisterForm> {
 
   @override
   Widget build(BuildContext context) {
-    // Phần UI hoàn toàn không thay đổi
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      padding: const EdgeInsets.all(32.0),
       constraints: const BoxConstraints(maxWidth: 400),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          // TIÊU ĐỀ
+          Text(
             'ĐĂNG KÝ',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: kPrimaryBrown,
-              letterSpacing: 1.5,
+            style: AppFonts.title1.copyWith(
+              color: kPrimaryTextColor,
+              fontWeight: FontWeight.bold,
             ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tạo tài khoản mới',
+            textAlign: TextAlign.center,
+            style: AppFonts.body.copyWith(color: kSecondaryTextColor),
           ),
           const SizedBox(height: 40),
 
+          // INPUT FIELDS
           _buildInputField(
             controller: _fullNameController,
             hintText: 'Họ và tên',
             keyboardType: TextInputType.name,
+            prefixIcon: const Icon(Icons.person_outline),
           ),
           const SizedBox(height: 20),
           _buildInputField(
             controller: _emailController,
             hintText: 'Email của bạn',
             keyboardType: TextInputType.emailAddress,
+            prefixIcon: const Icon(Icons.email_outlined),
           ),
           const SizedBox(height: 20),
           _buildInputField(
             controller: _phoneNumberController,
             hintText: 'Số điện thoại',
             keyboardType: TextInputType.phone,
+            prefixIcon: const Icon(Icons.phone_outlined),
           ),
           const SizedBox(height: 20),
           _buildInputField(
             controller: _passwordController,
             hintText: 'Mật khẩu',
             obscureText: !_isPasswordVisible,
+            prefixIcon: const Icon(Icons.lock_outline),
             suffixIcon: IconButton(
               icon: Icon(
                 _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                color: kPrimaryBrown, size: 20,
+                color: kSecondaryTextColor,
+                size: 20,
               ),
-              onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+              onPressed: () =>
+                  setState(() => _isPasswordVisible = !_isPasswordVisible),
             ),
           ),
           const SizedBox(height: 20),
@@ -172,33 +185,55 @@ class _RegisterFormState extends State<RegisterForm> {
             controller: _confirmPasswordController,
             hintText: 'Xác nhận mật khẩu',
             obscureText: !_isConfirmPasswordVisible,
+            prefixIcon: const Icon(Icons.lock_outline),
             suffixIcon: IconButton(
               icon: Icon(
-                _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                color: kPrimaryBrown, size: 20,
+                _isConfirmPasswordVisible
+                    ? Icons.visibility
+                    : Icons.visibility_off,
+                color: kSecondaryTextColor,
+                size: 20,
               ),
-              onPressed: () => setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
+              onPressed: () => setState(
+                () => _isConfirmPasswordVisible = !_isConfirmPasswordVisible,
+              ),
             ),
           ),
           const SizedBox(height: 30),
 
+          // NÚT ĐĂNG KÝ VÀ LOADING
           if (_isLoading)
-            const Center(child: CircularProgressIndicator(color: kPrimaryBrown))
+            Center(
+              child: CircularProgressIndicator(
+                color: kAccentColor,
+                strokeWidth: 2,
+              ),
+            )
           else
             _buildRegisterButton(),
 
-          const SizedBox(height: 40),
+          const SizedBox(height: 30),
 
+          // LINK ĐĂNG NHẬP
           _buildLoginLink(),
-          const SizedBox(height: 10),
+          const SizedBox(height: 20),
 
+          // HIỂN THỊ LỖI
           if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 15),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: kErrorColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: kErrorColor.withValues(alpha: 0.3)),
+              ),
               child: Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+                style: AppFonts.caption1.copyWith(
+                  color: kErrorColor,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
         ],
@@ -206,89 +241,109 @@ class _RegisterFormState extends State<RegisterForm> {
     );
   }
 
-  // Widget _buildInputField không thay đổi
   Widget _buildInputField({
     required TextEditingController controller,
     required String hintText,
     TextInputType keyboardType = TextInputType.text,
     bool obscureText = false,
+    Widget? prefixIcon,
     Widget? suffixIcon,
   }) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: kInputBorderColor, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 3),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: kSurfaceColor.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kGlassBorder, width: 0.5),
           ),
-        ],
-      ),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        obscureText: obscureText,
-        style: const TextStyle(color: kPrimaryBrown),
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(color: kPrimaryBrown.withOpacity(0.6), fontSize: 14),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-          border: InputBorder.none,
-          suffixIcon: suffixIcon,
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            obscureText: obscureText,
+            style: AppFonts.body.copyWith(color: kPrimaryTextColor),
+            decoration: InputDecoration(
+              hintText: hintText,
+              hintStyle: AppFonts.body.copyWith(color: kSecondaryTextColor),
+              prefixIcon: prefixIcon,
+              suffixIcon: suffixIcon,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              border: InputBorder.none,
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // Widget _buildRegisterButton không thay đổi
   Widget _buildRegisterButton() {
-    return SizedBox(
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _register,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: kSecondaryBeige,
-          foregroundColor: kPrimaryBrown,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [kAccentColor, kAccentColor.withValues(alpha: 0.8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: kAccentColor.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-          elevation: 5,
-        ),
-        child: const Text(
-          'ĐĂNG KÝ',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+          child: ElevatedButton(
+            onPressed: _register,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'ĐĂNG KÝ',
+              style: AppFonts.headline.copyWith(
+                color: kPrimaryTextColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // Widget _buildLoginLink đã được sửa logic onTap
   Widget _buildLoginLink() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
-          'Đã có tài khoản ? ',
-          style: TextStyle(color: Colors.black54, fontSize: 16),
+        Text(
+          'Đã có tài khoản? ',
+          style: AppFonts.body.copyWith(color: kSecondaryTextColor),
         ),
         GestureDetector(
-          // THAY ĐỔI 3: Sửa lại hàm onTap để tự quay về
           onTap: () {
-            // Quay lại màn hình trước đó (chính là LoginScreen)
             Navigator.pop(context);
           },
-          child: const Text(
+          child: Text(
             'Đăng nhập',
-            style: TextStyle(
-              color: kPrimaryBrown,
-              fontSize: 16,
+            style: AppFonts.body.copyWith(
+              color: kAccentColor,
               fontWeight: FontWeight.bold,
               decoration: TextDecoration.underline,
-              decorationColor: kPrimaryBrown,
+              decorationColor: kAccentColor,
             ),
           ),
         ),

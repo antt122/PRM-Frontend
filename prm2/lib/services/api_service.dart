@@ -1,13 +1,15 @@
-
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import 'package:prm2/models/my_subscription.dart';
-import 'package:prm2/models/payment_method.dart';
-import 'package:prm2/models/subscription_registration_response.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../models/my_subscription.dart';
+import '../models/payment_method.dart';
+import '../models/subscription_registration_response.dart';
 import '../models/api_result.dart';
 import '../models/creator_application.dart';
 import '../models/creator_application_status.dart';
@@ -15,7 +17,14 @@ import '../models/login_data.dart';
 import '../models/my_post.dart';
 import '../models/subscription_plan.dart';
 import '../models/user_profile.dart';
-import 'package:image_picker/image_picker.dart';
+import '../models/podcast.dart';
+import '../models/pagination_result.dart';
+import '../models/podcast_category.dart';
+import '../models/podcast_recommendation.dart';
+import '../models/user_state_response.dart';
+import '../models/creator_dashboard_stats.dart';
+import 'token_manager.dart';
+import 'auth_service.dart';
 
 class ApiService {
   // --- CÁC URL ĐƯỢC CHUYỂN THÀNH GETTER ĐỂ TRÁNH RACE CONDITION ---
@@ -23,7 +32,6 @@ class ApiService {
 
   static String get _authUrl => '$_baseUrl/user/auth';
   static String get _userUrl => '$_baseUrl/user';
-  static String get _creatorApiUrl => '$_baseUrl';
   static String get _cmsUrl => '$_baseUrl/cms';
 
   static String get _registerUrl => '$_authUrl/register';
@@ -31,26 +39,47 @@ class ApiService {
   static String get _loginUrl => '$_authUrl/login';
   static String get _plansUrl => '$_userUrl/subscription-plans';
   static String get _paymentMethodsUrl => '$_userUrl/payment-methods';
-  static String get _registerSubscriptionUrl => '$_userUrl/subscriptions/register';
-  static String get _mySubscriptionUrl => '$_userUrl/subscriptions/me'; // <-- THÊM MỚI
+  static String get _registerSubscriptionUrl =>
+      '$_userUrl/subscriptions/register';
+  static String get _mySubscriptionUrl =>
+      '$_userUrl/subscriptions/me'; // <-- THÊM MỚI
   static String get _checkoutUrl => '$_userUrl/profile';
-  static String get _creatorApplicationUrl => '$_creatorApiUrl/CreatorApplications';
-  static String get _creatorStatusUrl => '$_creatorApiUrl/CreatorApplications/my-status';
-  static String get _creatorPodcastsUrl => '$_creatorApiUrl/creator/podcasts';
-  static String get _createPodcastUrl => '$_creatorApiUrl/creator/podcasts';
+  static String get _creatorApplicationUrl => '$_userUrl/CreatorApplications';
+  static String get _creatorStatusUrl =>
+      '$_userUrl/CreatorApplications/my-status';
+  static String get _userStateUrl => '$_userUrl/state/me';
+  static String get _isContentCreatorUrl =>
+      '$_userUrl/state/is-content-creator';
+  static String get _creatorPodcastsUrl => '$_baseUrl/content/creator/podcasts';
+  static String get _createPodcastUrl => '$_baseUrl/content/creator/podcasts';
+  static String get _userPodcastsUrl => '$_baseUrl/content/user/podcasts';
+  static String get _recommendationsUrl => '$_baseUrl/recommendations';
 
-// --- HÀM HELPER MỚI ĐỂ LẤY HEADER CÓ TOKEN ---
+  // --- HÀM HELPER MỚI ĐỂ LẤY HEADER CÓ TOKEN ---
   static Future<Map<String, String>> _getAuthHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
+    // Get current token from TokenManager
+    final currentToken = TokenManager.instance.accessToken;
 
-    if (token != null) {
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
+    final headers = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning':
+          'true', // Bypass ngrok free tier browser warning
+      'User-Agent': 'Flutter-Client', // Identify as non-browser for ngrok
+    };
+
+    if (currentToken != null) {
+      headers['Authorization'] = 'Bearer $currentToken';
     }
-    return {'Content-Type': 'application/json'};
+
+    return headers;
+  }
+
+  // --- HÀM HELPER ĐỂ CHECK 401 VÀ HANDLE UNAUTHORIZED ---
+  static Future<void> _handleHttpResponse(http.Response response) async {
+    if (response.statusCode == 401) {
+      print('🔒 ApiService: 401 Unauthorized detected, triggering logout');
+      await AuthService.instance.handleUnauthorized();
+    }
   }
 
   // ========================================================================
@@ -61,11 +90,19 @@ class ApiService {
     final url = Uri.parse(_mySubscriptionUrl);
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
 
       final jsonResponse = jsonDecode(response.body);
       if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
-        return ApiResult(isSuccess: false, message: jsonResponse['message'] ?? 'Lỗi tải thông tin gói cước');
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi tải thông tin gói cước',
+        );
       }
 
       // API này trả về object trực tiếp trong `data`
@@ -74,36 +111,54 @@ class ApiService {
         (dataJson) => MySubscription.fromJson(dataJson as Map<String, dynamic>),
       );
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}',
+      );
     }
   }
-
 
   static Future<ApiResult<List<PaymentMethod>>> getPaymentMethods() async {
     final url = Uri.parse('$_paymentMethodsUrl?status=1');
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode != 200 || !(jsonDecode(response.body)['isSuccess'] ?? false)) {
-        return ApiResult(isSuccess: false, message: jsonDecode(response.body)['message'] ?? 'Lỗi tải phương thức thanh toán');
+      if (response.statusCode != 200 ||
+          !(jsonDecode(response.body)['isSuccess'] ?? false)) {
+        return ApiResult(
+          isSuccess: false,
+          message:
+              jsonDecode(response.body)['message'] ??
+              'Lỗi tải phương thức thanh toán',
+        );
       }
 
       final jsonResponse = jsonDecode(response.body);
       final itemsList = jsonResponse['items'] as List<dynamic>?;
       if (itemsList == null) {
-        return ApiResult(isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng (key items is null).');
+        return ApiResult(
+          isSuccess: false,
+          message: 'Dữ liệu trả về không đúng định dạng (key items is null).',
+        );
       }
 
-      final methods = itemsList.map((item) => PaymentMethod.fromJson(item as Map<String, dynamic>)).toList();
+      final methods = itemsList
+          .map((item) => PaymentMethod.fromJson(item as Map<String, dynamic>))
+          .toList();
       return ApiResult(isSuccess: true, data: methods);
-
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}',
+      );
     }
   }
 
-  static Future<ApiResult<SubscriptionRegistrationResponse>> registerSubscription({
+  static Future<ApiResult<SubscriptionRegistrationResponse>>
+  registerSubscription({
     required String planId,
     required String paymentMethodId,
   }) async {
@@ -115,29 +170,34 @@ class ApiService {
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 20));
+      final response = await http
+          .post(url, headers: headers, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 20));
 
       final jsonResponse = jsonDecode(response.body);
 
       if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
-          return ApiResult(
-            isSuccess: false,
-            message: jsonResponse['message'] as String?,
-            errors: (jsonResponse['errors'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
-            errorCode: jsonResponse['errorCode'] as String?,
-          );
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] as String?,
+          errors: (jsonResponse['errors'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList(),
+          errorCode: jsonResponse['errorCode'] as String?,
+        );
       }
 
       return ApiResult.fromJson(
         jsonResponse,
-        (dataJson) => SubscriptionRegistrationResponse.fromJson(dataJson as Map<String, dynamic>),
+        (dataJson) => SubscriptionRegistrationResponse.fromJson(
+          dataJson as Map<String, dynamic>,
+        ),
       );
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Lỗi đăng ký gói: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Lỗi đăng ký gói: ${e.toString()}',
+      );
     }
   }
 
@@ -148,100 +208,407 @@ class ApiService {
     final url = Uri.parse('$_plansUrl?page=$page&pageSize=$pageSize');
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(
-          const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       final jsonResponse = jsonDecode(response.body);
 
       if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
-         return ApiResult(isSuccess: false, message: jsonResponse['message'] ?? 'Lỗi tải các gói subscription');
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi tải các gói subscription',
+        );
       }
 
       final itemsList = jsonResponse['items'] as List<dynamic>?;
       if (itemsList == null) {
         return ApiResult(
-            isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng (key items is null).');
+          isSuccess: false,
+          message: 'Dữ liệu trả về không đúng định dạng (key items is null).',
+        );
       }
 
-      final plans = itemsList.map((planJson) =>
-          SubscriptionPlan.fromJson(planJson as Map<String, dynamic>)).toList();
+      final plans = itemsList
+          .map(
+            (planJson) =>
+                SubscriptionPlan.fromJson(planJson as Map<String, dynamic>),
+          )
+          .toList();
 
-      return ApiResult(
-        isSuccess: true,
-        data: plans,
-      );
+      return ApiResult(isSuccess: true, data: plans);
     } on TimeoutException {
       return ApiResult(
-          isSuccess: false,
-          message: 'Hết thời gian yêu cầu. Vui lòng thử lại.');
+        isSuccess: false,
+        message: 'Hết thời gian yêu cầu. Vui lòng thử lại.',
+      );
     } on http.ClientException catch (e) {
-      return ApiResult(
-          isSuccess: false, message: 'Lỗi kết nối: ${e.message}');
+      return ApiResult(isSuccess: false, message: 'Lỗi kết nối: ${e.message}');
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Đã có lỗi không mong muốn xảy ra: ${e.toString()}',
+      );
     }
   }
-
 
   // ... (các hàm còn lại giữ nguyên) ...
-  Future<dynamic> createPodcast({
-    required String authToken,
+
+  /// Create a new podcast with audio and thumbnail file upload
+  ///
+  /// Parameters:
+  /// - title: Podcast title (required, 3-200 chars)
+  /// - description: Podcast description (required, 10-2000 chars)
+  /// - audioFile: Audio file to upload (required, MP3/WAV/OGG/M4A/MP4, max 500MB)
+  /// - thumbnailFile: Thumbnail image file (optional, JPG/PNG/WEBP, max 10MB)
+  /// - duration: Duration in seconds (required, 1-18000)
+  /// - hostName: Host name (optional, max 100 chars)
+  /// - guestName: Guest name (optional, max 100 chars)
+  /// - episodeNumber: Episode number (optional, default 1)
+  /// - seriesName: Series name (optional, max 200 chars)
+  /// - tags: List of tags (optional)
+  /// - emotionCategories: List of emotion categories (optional)
+  /// - topicCategories: List of topic categories (optional)
+  /// - transcriptUrl: URL to transcript (optional, max 1000 chars)
+  ///
+  /// Returns: CreatePodcastResponse with podcast ID
+  ///
+  /// Throws: Exception if upload fails
+  static Future<ApiResult> createPodcast({
     required String title,
     required String description,
-    required XFile thumbnailFile,
-    required String audioFilePath,
-    required String audioFileName,
-    required String seriesName,
-    required String guestName,
-    required int episodeNumber,
-    required int topicCategories,
-    required String hostName,
+    required PlatformFile audioFile,
+    dynamic thumbnailFile, // Can be PlatformFile (web) or XFile (mobile)
     required int duration,
-    required int emotionCategories,
-    required String tags,
-    required String transcriptUrl,
+    String? hostName,
+    String? guestName,
+    int episodeNumber = 1,
+    String? seriesName,
+    List<String>? tags,
+    List<EmotionCategory>? emotionCategories,
+    List<TopicCategory>? topicCategories,
+    String? transcriptUrl,
   }) async {
-    final url = Uri.parse(_createPodcastUrl);
-    final request = http.MultipartRequest('POST', url);
+    try {
+      print('DEBUG: Starting createPodcast');
+      print('DEBUG: emotionCategories = $emotionCategories');
+      print('DEBUG: topicCategories = $topicCategories');
 
-    request.headers['Authorization'] = 'Bearer $authToken';
+      final url = Uri.parse(_createPodcastUrl);
+      final headers = await _getAuthHeaders();
+      print('DEBUG: Headers prepared');
 
-    request.fields['Title'] = title;
-    request.fields['Description'] = description;
-    request.fields['SeriesName'] = seriesName;
-    request.fields['GuestName'] = guestName;
-    request.fields['EpisodeNumber'] = episodeNumber.toString();
-    request.fields['TopicCategories'] = topicCategories.toString();
-    request.fields['HostName'] = hostName;
-    request.fields['Duration'] = duration.toString();
-    request.fields['EmotionCategories'] = emotionCategories.toString();
-    request.fields['Tags'] = tags;
-    request.fields['TranscriptUrl'] = transcriptUrl;
+      // Create multipart request
+      final request = http.MultipartRequest('POST', url);
+      request.headers.addAll(headers);
 
-    request.files.add(await http.MultipartFile.fromPath(
-      'Thumbnail',
-      thumbnailFile.path,
-      contentType: MediaType('image', 'jpeg'),
-    ));
+      // Add form fields
+      request.fields['Title'] = title;
+      request.fields['Description'] = description;
+      request.fields['Duration'] = duration.toString();
+      request.fields['EpisodeNumber'] = episodeNumber.toString();
 
-    request.files.add(await http.MultipartFile.fromPath(
-      'AudioFile',
-      audioFilePath,
-      filename: audioFileName,
-      contentType: MediaType('audio', 'mpeg'),
-    ));
+      // Optional fields
+      if (hostName != null && hostName.isNotEmpty) {
+        request.fields['HostName'] = hostName;
+      }
+      if (guestName != null && guestName.isNotEmpty) {
+        request.fields['GuestName'] = guestName;
+      }
+      if (seriesName != null && seriesName.isNotEmpty) {
+        request.fields['SeriesName'] = seriesName;
+      }
+      if (transcriptUrl != null && transcriptUrl.isNotEmpty) {
+        request.fields['TranscriptUrl'] = transcriptUrl;
+      }
 
-    final response = await request.send();
+      // Add tags as individual fields (ASP.NET Form Binder expects: Tags=tag1&Tags=tag2)
+      if (tags != null && tags.isNotEmpty) {
+        for (int i = 0; i < tags.length; i++) {
+          request.fields['Tags[$i]'] = tags[i];
+        }
+      }
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final responseBody = await response.stream.bytesToString();
-      return jsonDecode(responseBody);
-    } else {
-      throw Exception('Failed to create podcast: ${response.statusCode}');
+      // Add emotion categories as individual fields (ASP.NET Form Binder expects: EmotionCategories[0]=1&EmotionCategories[1]=2)
+      // This way ASP.NET Model Binder can properly deserialize to List<EmotionCategory>
+      if (emotionCategories != null && emotionCategories.isNotEmpty) {
+        print(
+          'DEBUG: Adding emotion categories, count=${emotionCategories.length}',
+        );
+        for (int i = 0; i < emotionCategories.length; i++) {
+          final emotion = emotionCategories[i];
+          print(
+            'DEBUG: emotion[$i] = ${emotion.name}, value = ${emotion.value}',
+          );
+          request.fields['EmotionCategories[$i]'] = emotion.value.toString();
+        }
+      }
+
+      // Add topic categories as individual fields (ASP.NET Form Binder expects: TopicCategories[0]=1&TopicCategories[1]=2)
+      if (topicCategories != null && topicCategories.isNotEmpty) {
+        print(
+          'DEBUG: Adding topic categories, count=${topicCategories.length}',
+        );
+        for (int i = 0; i < topicCategories.length; i++) {
+          final topic = topicCategories[i];
+          print('DEBUG: topic[$i] = ${topic.name}, value = ${topic.value}');
+          request.fields['TopicCategories[$i]'] = topic.value.toString();
+        }
+      }
+
+      // Add audio file (required)
+      try {
+        print('DEBUG: About to process audio file: ${audioFile.name}');
+
+        if (kIsWeb) {
+          // Web: Use bytes directly
+          final audioBytes = audioFile.bytes;
+          if (audioBytes == null || audioBytes.isEmpty) {
+            throw Exception('Audio file bytes are empty');
+          }
+          print(
+            'DEBUG: Web - Audio file processed successfully, size=${audioBytes.length}',
+          );
+
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'AudioFile',
+              audioBytes,
+              filename: audioFile.name,
+              contentType: MediaType('audio', 'mpeg'),
+            ),
+          );
+        } else {
+          // Mobile/Desktop: Read from file path
+          if (audioFile.path == null) {
+            throw Exception('Audio file path is null');
+          }
+
+          print(
+            'DEBUG: Mobile - Reading audio file from path: ${audioFile.path}',
+          );
+          final audioFileObj = File(audioFile.path!);
+
+          if (!audioFileObj.existsSync()) {
+            throw Exception(
+              'Audio file does not exist at path: ${audioFile.path}',
+            );
+          }
+
+          final audioBytes = await audioFileObj.readAsBytes();
+          if (audioBytes.isEmpty) {
+            throw Exception('Audio file is empty');
+          }
+
+          print(
+            'DEBUG: Mobile - Audio file processed successfully, size=${audioBytes.length}',
+          );
+
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'AudioFile',
+              audioBytes,
+              filename: audioFile.name,
+              contentType: MediaType('audio', 'mpeg'),
+            ),
+          );
+        }
+      } catch (e) {
+        print('ERROR processing audio file: $e');
+        rethrow;
+      }
+
+      // Add thumbnail file if provided
+      if (thumbnailFile != null) {
+        try {
+          List<int> thumbBytes;
+          String thumbFilename;
+
+          // Try to extract bytes from different file types
+          if (thumbnailFile is PlatformFile) {
+            // Web/Mobile file from file_picker
+            thumbBytes = thumbnailFile.bytes ?? [];
+            thumbFilename = thumbnailFile.name;
+          } else if (thumbnailFile is XFile) {
+            // Mobile file from image_picker
+            thumbBytes = await thumbnailFile.readAsBytes();
+            thumbFilename = thumbnailFile.name;
+          } else {
+            // Try dynamic approach for unknown types
+            print(
+              'DEBUG: Thumbnail type is ${thumbnailFile.runtimeType}, attempting dynamic extraction',
+            );
+
+            // Try to call readAsBytes() dynamically
+            if (thumbnailFile.readAsBytes != null) {
+              thumbBytes = await thumbnailFile.readAsBytes();
+            } else if (thumbnailFile.bytes != null) {
+              thumbBytes = thumbnailFile.bytes ?? [];
+            } else {
+              throw Exception(
+                'Cannot extract bytes from thumbnail file type: ${thumbnailFile.runtimeType}',
+              );
+            }
+
+            // Try to get filename
+            thumbFilename =
+                thumbnailFile.name ??
+                thumbnailFile.path?.split('/').last ??
+                'thumbnail.jpg';
+          }
+
+          if (thumbBytes.isEmpty) {
+            print(
+              'WARNING: Thumbnail file bytes are empty, skipping thumbnail upload',
+            );
+            // Don't throw - allow podcast creation without thumbnail
+          } else {
+            print(
+              'DEBUG: Thumbnail file processed successfully, size=${thumbBytes.length}',
+            );
+
+            request.files.add(
+              http.MultipartFile.fromBytes(
+                'ThumbnailFile',
+                thumbBytes,
+                filename: thumbFilename,
+                contentType: MediaType('image', 'jpeg'),
+              ),
+            );
+          }
+        } catch (e) {
+          print('ERROR processing thumbnail file: $e');
+          print(
+            'WARNING: Continuing without thumbnail - thumbnail is optional',
+          );
+          // Don't rethrow - thumbnail is optional
+        }
+      }
+
+      // Send request with extended timeout for large files
+      print('DEBUG: About to send request to $_createPodcastUrl');
+      print('DEBUG: Form fields keys: ${request.fields.keys.toList()}');
+      print('DEBUG: Form files count: ${request.files.length}');
+
+      // Calculate timeout based on file size (1MB = 20 seconds for better stability)
+      final audioFileSize = audioFile.size;
+      final timeoutSeconds = (audioFileSize / (1024 * 1024) * 20).ceil().clamp(
+        120,
+        900,
+      ); // Min 2min, Max 15min
+      print(
+        'DEBUG: File size: ${(audioFileSize / (1024 * 1024)).toStringAsFixed(2)}MB, Timeout: ${timeoutSeconds}s',
+      );
+
+      // Send request with timeout
+      final streamedResponse = await request.send().timeout(
+        Duration(seconds: timeoutSeconds),
+      );
+      print('DEBUG: Request sent successfully, awaiting response...');
+      final response = await http.Response.fromStream(
+        streamedResponse,
+      ).timeout(Duration(seconds: 60));
+
+      // Process response
+      print('DEBUG: Response status: ${response.statusCode}');
+      print('DEBUG: Response body: ${response.body}');
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        try {
+          final jsonResponse = jsonDecode(response.body);
+          print('DEBUG: Parsed JSON response: $jsonResponse');
+
+          // Handle different response formats
+          if (jsonResponse is Map<String, dynamic>) {
+            return ApiResult(
+              isSuccess: true,
+              message: 'Podcast created successfully',
+              data: jsonResponse['data'] ?? jsonResponse,
+              errorCode: null,
+            );
+          } else {
+            // Response is not a Map, treat as direct data
+            return ApiResult(
+              isSuccess: true,
+              message: 'Podcast created successfully',
+              data: jsonResponse,
+              errorCode: null,
+            );
+          }
+        } catch (e) {
+          print('ERROR: Failed to parse JSON response: $e');
+          return ApiResult(
+            isSuccess: false,
+            message: 'Invalid response format from server',
+            errorCode: 'PARSE_ERROR',
+          );
+        }
+      } else if (response.statusCode == 400) {
+        try {
+          final jsonResponse = jsonDecode(response.body);
+          return ApiResult(
+            isSuccess: false,
+            message: jsonResponse['message'] ?? 'Validation error',
+            errors: jsonResponse['errors'] is List
+                ? List<String>.from(jsonResponse['errors'])
+                : [],
+            errorCode: '400',
+          );
+        } catch (e) {
+          return ApiResult(
+            isSuccess: false,
+            message: 'Validation error',
+            errorCode: '400',
+          );
+        }
+      } else if (response.statusCode == 401) {
+        return ApiResult(
+          isSuccess: false,
+          message: 'Unauthorized - Please login again',
+          errorCode: '401',
+        );
+      } else if (response.statusCode == 413) {
+        return ApiResult(
+          isSuccess: false,
+          message: 'File too large - Maximum size is 500MB',
+          errorCode: '413',
+        );
+      } else {
+        return ApiResult(
+          isSuccess: false,
+          message: 'Failed to create podcast: ${response.statusCode}',
+          errorCode: '${response.statusCode}',
+        );
+      }
+    } catch (e, stackTrace) {
+      print('ERROR: Exception in createPodcast: $e');
+      print('ERROR: Stack trace: $stackTrace');
+
+      // Handle specific network errors
+      if (e.toString().contains('Connection reset by peer') ||
+          e.toString().contains('SocketException')) {
+        return ApiResult(
+          isSuccess: false,
+          message:
+              'Kết nối bị ngắt. File có thể quá lớn hoặc mạng không ổn định. Vui lòng thử lại với file nhỏ hơn.',
+          errorCode: 'NETWORK_ERROR',
+        );
+      } else if (e.toString().contains('TimeoutException')) {
+        return ApiResult(
+          isSuccess: false,
+          message:
+              'Hết thời gian upload. File quá lớn hoặc mạng chậm. Vui lòng thử lại.',
+          errorCode: 'TIMEOUT',
+        );
+      }
+
+      return ApiResult(
+        isSuccess: false,
+        message: 'Error creating podcast: ${e.toString()}',
+        errorCode: 'EXCEPTION',
+      );
     }
   }
-
 
   static Future<ApiResult<dynamic>> register({
     required String email,
@@ -257,27 +624,39 @@ class ApiService {
       'confirmPassword': confirmPassword,
       'fullName': fullName,
       'phoneNumber': phoneNumber,
-      'otpSentChannel': 1
+      'otpSentChannel': 1,
     };
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+              'User-Agent': 'Flutter-Client',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final jsonResponse = jsonDecode(response.body);
       return ApiResult.fromJson(jsonResponse, (data) => null);
     } on TimeoutException {
       return ApiResult(
-          isSuccess: false, errors: ['Request timed out. Please try again.']);
+        isSuccess: false,
+        errors: ['Request timed out. Please try again.'],
+      );
     } on http.ClientException catch (e) {
       return ApiResult(
-          isSuccess: false, errors: ['Connection error: ${e.message}']);
+        isSuccess: false,
+        errors: ['Connection error: ${e.message}'],
+      );
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          errors: ['An unexpected error occurred: ${e.toString()}']);
+      return ApiResult(
+        isSuccess: false,
+        errors: ['An unexpected error occurred: ${e.toString()}'],
+      );
     }
   }
 
@@ -294,11 +673,17 @@ class ApiService {
     };
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+              'User-Agent': 'Flutter-Client',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final jsonResponse = jsonDecode(response.body);
       return ApiResult.fromJson(jsonResponse, (data) => null);
@@ -306,10 +691,14 @@ class ApiService {
       return ApiResult(isSuccess: false, message: 'Request timed out.');
     } on http.ClientException catch (e) {
       return ApiResult(
-          isSuccess: false, message: 'Connection error: ${e.message}');
+        isSuccess: false,
+        message: 'Connection error: ${e.message}',
+      );
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'An unexpected error occurred: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'An unexpected error occurred: ${e.toString()}',
+      );
     }
   }
 
@@ -318,33 +707,49 @@ class ApiService {
     required String password,
   }) async {
     final url = Uri.parse(_loginUrl);
-    final body = {
-      'email': email,
-      'password': password,
-      'grantType': 0,
-    };
+    final body = {'email': email, 'password': password, 'grantType': 0};
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+              'User-Agent': 'Flutter-Client',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final jsonResponse = jsonDecode(response.body);
 
-      return ApiResult.fromJson(
+      final result = ApiResult.fromJson(
         jsonResponse,
-            (dataJson) => LoginData.fromJson(dataJson as Map<String, dynamic>),
+        (dataJson) => LoginData.fromJson(dataJson as Map<String, dynamic>),
       );
+
+      // Initialize TokenManager after successful login
+      if (result.isSuccess && result.data != null) {
+        await TokenManager.instance.updateToken(
+          result.data!.accessToken,
+          DateTime.parse(result.data!.expiresAt),
+        );
+      }
+
+      return result;
     } on TimeoutException {
       return ApiResult(isSuccess: false, message: 'Request timed out.');
     } on http.ClientException catch (e) {
       return ApiResult(
-          isSuccess: false, message: 'Connection error: ${e.message}');
+        isSuccess: false,
+        message: 'Connection error: ${e.message}',
+      );
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'An unexpected error occurred: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'An unexpected error occurred: ${e.toString()}',
+      );
     }
   }
 
@@ -352,37 +757,44 @@ class ApiService {
     final url = Uri.parse(_checkoutUrl);
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(url, headers: headers).timeout(
-          const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
+
       final jsonResponse = jsonDecode(response.body);
 
       if (response.statusCode == 401) {
         return ApiResult(
-            isSuccess: false, message: 'Phiên đăng nhập đã hết hạn.');
+          isSuccess: false,
+          message: 'Phiên đăng nhập đã hết hạn.',
+        );
       }
 
       return ApiResult.fromJson(
         jsonResponse,
-            (dataJson) =>
-            UserProfile.fromJson(jsonResponse),
+        (dataJson) => UserProfile.fromJson(jsonResponse),
       );
     } catch (e) {
-      return ApiResult(isSuccess: false,
-          message: 'Lỗi lấy thông tin người dùng: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Lỗi lấy thông tin người dùng: ${e.toString()}',
+      );
     }
   }
 
   static Future<ApiResult<dynamic>> submitCreatorApplication(
-      CreatorApplication application) async {
+    CreatorApplication application,
+  ) async {
     final body = application.toJson();
     final url = Uri.parse(_creatorApplicationUrl);
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .post(url, headers: headers, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseBody = jsonDecode(response.body);
@@ -393,7 +805,8 @@ class ApiService {
         );
       } else {
         final errorBody = jsonDecode(response.body);
-        String errorMessage = 'Lỗi ${response.statusCode}. Server không phản hồi.';
+        String errorMessage =
+            'Lỗi ${response.statusCode}. Server không phản hồi.';
         if (errorBody['errors'] != null && errorBody['errors'] is Map) {
           final validationErrors = (errorBody['errors'] as Map).values
               .expand((list) => list as Iterable)
@@ -403,27 +816,37 @@ class ApiService {
         return ApiResult(isSuccess: false, message: errorMessage);
       }
     } catch (e) {
-      return ApiResult(isSuccess: false, message: 'Đã xảy ra lỗi kết nối: ${e.toString()}');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Đã xảy ra lỗi kết nối: ${e.toString()}',
+      );
     }
   }
 
   static Future<ApiResult<CreatorApplicationStatus>>
-      getMyCreatorApplicationStatus() async {
+  getMyCreatorApplicationStatus() async {
     final url = Uri.parse(_creatorStatusUrl);
     try {
       final headers = await _getAuthHeaders();
-      final response =
-          await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
 
       if (response.statusCode == 404) {
         return ApiResult(
-            isSuccess: false,
-            message: 'Bạn chưa nộp đơn đăng ký.',
-            errorCode: '404');
+          isSuccess: false,
+          message: 'Bạn chưa nộp đơn đăng ký.',
+          errorCode: '404',
+        );
       }
       if (response.statusCode == 401) {
         return ApiResult(
-            isSuccess: false, message: 'Phiên đăng nhập đã hết hạn.');
+          isSuccess: false,
+          message: 'Phiên đăng nhập đã hết hạn.',
+        );
       }
 
       final jsonResponse = jsonDecode(response.body);
@@ -436,37 +859,895 @@ class ApiService {
       }
 
       return ApiResult(
-          isSuccess: false, message: 'Lỗi không xác định khi lấy trạng thái.');
+        isSuccess: false,
+        message: 'Lỗi không xác định khi lấy trạng thái.',
+      );
     } catch (e) {
       return ApiResult(isSuccess: false, message: 'Lỗi: ${e.toString()}');
     }
   }
 
-  static Future<ApiResult<List<MyPost>>> getMyPosts(
-      {int page = 1, int pageSize = 20}) async {
-    final url =
-        Uri.parse('$_creatorPodcastsUrl/my-podcasts?page=$page&pageSize=$pageSize');
+  static Future<ApiResult<List<MyPost>>> getMyPosts({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final url = Uri.parse(
+      '$_cmsUrl/posts/my-posts?page=$page&pageSize=$pageSize',
+    );
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(url, headers: headers);
       final jsonResponse = jsonDecode(response.body);
-
+      print("jsonResponse: $jsonResponse");
       if (response.statusCode != 200) {
         return ApiResult(
-            isSuccess: false, message: 'Lỗi ${response.statusCode}: ${jsonResponse['message']}');
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}: ${jsonResponse['message']}',
+        );
       }
 
-      final itemsList = jsonResponse['podcasts'] as List<dynamic>?;
+      final itemsList = jsonResponse['posts'] as List<dynamic>?;
       if (itemsList == null) {
         return ApiResult(
-            isSuccess: false, message: 'Dữ liệu trả về không đúng định dạng.');
+          isSuccess: false,
+          message: 'Dữ liệu trả về không đúng định dạng.',
+        );
       }
 
       final posts = itemsList.map((p) => MyPost.fromJson(p)).toList();
       return ApiResult(isSuccess: true, data: posts);
     } catch (e) {
+      print("error: $e");
       return ApiResult(isSuccess: false, message: e.toString());
     }
   }
 
+  /// Get creator's podcasts (for Creator Dashboard)
+  static Future<PaginationResult<Podcast>> getMyPodcasts({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final url = Uri.parse(
+      '$_creatorPodcastsUrl/my-podcasts?page=$page&pageSize=$pageSize',
+    );
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(url, headers: headers);
+
+      print('[getMyPodcasts] Status: ${response.statusCode}');
+      print('[getMyPodcasts] URL: $url');
+      print('[getMyPodcasts] Body: ${response.body}');
+
+      if (response.statusCode == 404) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Endpoint not found. Please check backend route.',
+          errorCode: '404',
+        );
+      }
+
+      if (response.statusCode != 200) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Error ${response.statusCode}: ${response.body}',
+          errorCode: response.statusCode.toString(),
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // Backend returns: { podcasts: [...], totalCount, page, pageSize }
+      final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
+      if (podcastsList == null) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Invalid response format',
+        );
+      }
+
+      final podcasts = podcastsList
+          .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      final totalCount = jsonResponse['totalCount'] as int? ?? 0;
+      final totalPages = (totalCount / pageSize).ceil();
+
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: totalCount,
+        totalPages: totalPages,
+        hasPrevious: page > 1,
+        hasNext: page < totalPages,
+        items: podcasts,
+        isSuccess: true,
+        message: 'Success',
+      );
+    } catch (e) {
+      print('[getMyPodcasts] Error: $e');
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
+        items: [],
+        isSuccess: false,
+        message: 'Exception: $e',
+      );
+    }
+  }
+
+  // ========================================================================
+  // === PODCAST APIs FOR USERS ============================================
+  // ========================================================================
+
+  /// Get published podcasts for listening (trending/latest/by category)
+  static Future<PaginationResult<Podcast>> getPodcasts({
+    int page = 1,
+    int pageSize = 10,
+    List<int>? emotionCategories,
+    List<int>? topicCategories,
+    String? searchTerm,
+    String? seriesName,
+  }) async {
+    final queryParams = {
+      'page': page.toString(),
+      'pageSize': pageSize.toString(),
+      if (emotionCategories != null && emotionCategories.isNotEmpty)
+        'emotionCategories': emotionCategories.join(','),
+      if (topicCategories != null && topicCategories.isNotEmpty)
+        'topicCategories': topicCategories.join(','),
+      if (searchTerm != null && searchTerm.isNotEmpty) 'searchTerm': searchTerm,
+      if (seriesName != null && seriesName.isNotEmpty) 'seriesName': seriesName,
+    };
+
+    final url = Uri.parse(
+      _userPodcastsUrl,
+    ).replace(queryParameters: queryParams);
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // Parse response with correct structure: { podcasts: [...], totalCount, page, pageSize }
+      final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
+      if (podcastsList == null) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Invalid response format',
+        );
+      }
+
+      final podcasts = podcastsList
+          .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      final totalCount = jsonResponse['totalCount'] as int? ?? 0;
+      final totalPages = (totalCount / pageSize).ceil();
+
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: totalCount,
+        totalPages: totalPages,
+        hasPrevious: page > 1,
+        hasNext: page < totalPages,
+        items: podcasts,
+        isSuccess: true,
+        message: 'Success',
+      );
+    } catch (e) {
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
+        items: [],
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Get trending podcasts (most viewed)
+  static Future<PaginationResult<Podcast>> getTrendingPodcasts({
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    final url = Uri.parse(
+      '$_userPodcastsUrl/trending?page=$page&pageSize=$pageSize',
+    );
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // Parse response with correct structure: { podcasts: [...], totalCount, page, pageSize }
+      final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
+      if (podcastsList == null) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Invalid response format',
+        );
+      }
+
+      final podcasts = podcastsList
+          .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      final totalCount = jsonResponse['totalCount'] as int? ?? 0;
+      final totalPages = (totalCount / pageSize).ceil();
+
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: totalCount,
+        totalPages: totalPages,
+        hasPrevious: page > 1,
+        hasNext: page < totalPages,
+        items: podcasts,
+        isSuccess: true,
+        message: 'Success',
+      );
+    } catch (e) {
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
+        items: [],
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Get latest podcasts
+  static Future<PaginationResult<Podcast>> getLatestPodcasts({
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    final url = Uri.parse(
+      '$_userPodcastsUrl/latest?page=$page&pageSize=$pageSize',
+    );
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // Parse response with correct structure: { podcasts: [...], totalCount, page, pageSize }
+      final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
+      if (podcastsList == null) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Invalid response format',
+        );
+      }
+
+      final podcasts = podcastsList
+          .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      final totalCount = jsonResponse['totalCount'] as int? ?? 0;
+      final totalPages = (totalCount / pageSize).ceil();
+
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: totalCount,
+        totalPages: totalPages,
+        hasPrevious: page > 1,
+        hasNext: page < totalPages,
+        items: podcasts,
+        isSuccess: true,
+        message: 'Success',
+      );
+    } catch (e) {
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
+        items: [],
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Get podcast by ID (for users - public/published podcasts only)
+  static Future<ApiResult<Podcast>> getPodcastById(String id) async {
+    final url = Uri.parse('$_userPodcastsUrl/$id');
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return ApiResult(isSuccess: false, message: 'Không tìm thấy podcast');
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      return ApiResult(isSuccess: true, data: Podcast.fromJson(jsonResponse));
+    } catch (e) {
+      return ApiResult(isSuccess: false, message: 'Lỗi: ${e.toString()}');
+    }
+  }
+
+  /// Get podcast by ID for creator (view own podcast regardless of status)
+  static Future<ApiResult<Podcast>> getCreatorPodcastById(String id) async {
+    final url = Uri.parse('$_creatorPodcastsUrl/$id');
+
+    try {
+      final headers = await _getAuthHeaders();
+      print('🔍 DEBUG: Getting creator podcast by ID: $id');
+      print('🔍 DEBUG: URL: $url');
+
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      print(
+        '🔍 DEBUG: Creator podcast response status: ${response.statusCode}',
+      );
+      print('🔍 DEBUG: Creator podcast response body: ${response.body}');
+
+      if (response.statusCode != 200) {
+        return ApiResult(
+          isSuccess: false,
+          message: 'Không tìm thấy podcast (Status: ${response.statusCode})',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      return ApiResult(isSuccess: true, data: Podcast.fromJson(jsonResponse));
+    } catch (e) {
+      print('🔍 DEBUG: Error getting creator podcast: $e');
+      return ApiResult(isSuccess: false, message: 'Lỗi: ${e.toString()}');
+    }
+  }
+
+  /// Search podcasts
+  static Future<PaginationResult<Podcast>> searchPodcasts({
+    required String keyword,
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    final url = Uri.parse(
+      '$_userPodcastsUrl/search?keyword=$keyword&page=$page&pageSize=$pageSize',
+    );
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode}',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // Parse response with correct structure: { podcasts: [...], totalCount, page, pageSize }
+      final podcastsList = jsonResponse['podcasts'] as List<dynamic>?;
+      if (podcastsList == null) {
+        return PaginationResult<Podcast>(
+          currentPage: page,
+          pageSize: pageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasPrevious: false,
+          hasNext: false,
+          items: [],
+          isSuccess: false,
+          message: 'Invalid response format',
+        );
+      }
+
+      final podcasts = podcastsList
+          .map((json) => Podcast.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      final totalCount = jsonResponse['totalCount'] as int? ?? 0;
+      final totalPages = (totalCount / pageSize).ceil();
+
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: totalCount,
+        totalPages: totalPages,
+        hasPrevious: page > 1,
+        hasNext: page < totalPages,
+        items: podcasts,
+        isSuccess: true,
+        message: 'Success',
+      );
+    } catch (e) {
+      return PaginationResult<Podcast>(
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
+        items: [],
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Increment view count
+  static Future<void> incrementPodcastView(String podcastId) async {
+    final url = Uri.parse('$_userPodcastsUrl/$podcastId/views');
+    try {
+      final headers = await _getAuthHeaders();
+      print('🔍 DEBUG: Increment view URL: $url');
+      print('🔍 DEBUG: Headers: $headers');
+
+      final response = await http
+          .post(url, headers: headers)
+          .timeout(const Duration(seconds: 5));
+
+      print('🔍 DEBUG: View response status: ${response.statusCode}');
+      print('🔍 DEBUG: View response body: ${response.body}');
+    } catch (e) {
+      print('🔍 DEBUG: View increment error: $e');
+      // Silent fail - không cần thông báo lỗi cho user
+    }
+  }
+
+  /// Toggle like podcast (like/unlike)
+  static Future<ApiResult<bool>> toggleLikePodcast(String podcastId) async {
+    final url = Uri.parse('$_userPodcastsUrl/$podcastId/likes');
+    try {
+      final headers = await _getAuthHeaders();
+      print('🔍 DEBUG: Toggle like URL: $url');
+      print('🔍 DEBUG: Headers: $headers');
+
+      final response = await http
+          .post(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      print('🔍 DEBUG: Response status: ${response.statusCode}');
+      print('🔍 DEBUG: Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Backend returns { likes: number } format like Next.js
+        return ApiResult<bool>(
+          isSuccess: true,
+          data: data['isLiked'] ?? true, // Keep this for UI state
+          message: data['message'] ?? 'Success',
+        );
+      } else {
+        return ApiResult<bool>(
+          isSuccess: false,
+          message: 'Không thể thực hiện thao tác',
+        );
+      }
+    } catch (e) {
+      return ApiResult<bool>(isSuccess: false, message: 'Lỗi: ${e.toString()}');
+    }
+  }
+
+  /// Check if user liked a podcast
+  static Future<bool> checkPodcastLiked(String podcastId) async {
+    final url = Uri.parse('$_userPodcastsUrl/$podcastId/liked');
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['isLiked'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Get creator dashboard statistics
+  static Future<ApiResult<CreatorDashboardStats>>
+  getCreatorDashboardStats() async {
+    final url = Uri.parse('$_creatorPodcastsUrl/dashboard');
+
+    try {
+      final headers = await _getAuthHeaders();
+      print('📊 DEBUG: Getting creator dashboard stats from: $url');
+
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      print(
+        '📊 DEBUG: Dashboard stats response status: ${response.statusCode}',
+      );
+      print('📊 DEBUG: Dashboard stats response body: ${response.body}');
+
+      if (response.statusCode != 200) {
+        return ApiResult<CreatorDashboardStats>(
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode} khi lấy thống kê dashboard',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+
+      // Check if response has isSuccess field
+      if (jsonResponse is Map<String, dynamic>) {
+        if (jsonResponse.containsKey('isSuccess')) {
+          return ApiResult.fromJson(
+            jsonResponse,
+            (dataJson) => CreatorDashboardStats.fromJson(
+              dataJson as Map<String, dynamic>,
+            ),
+          );
+        } else {
+          // Direct data response (no wrapper)
+          return ApiResult(
+            isSuccess: true,
+            data: CreatorDashboardStats.fromJson(jsonResponse),
+            message: 'Success',
+          );
+        }
+      } else {
+        return ApiResult<CreatorDashboardStats>(
+          isSuccess: false,
+          message: 'Invalid response format',
+        );
+      }
+    } catch (e) {
+      print('📊 DEBUG: Dashboard stats error: $e');
+      return ApiResult<CreatorDashboardStats>(
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Check if user is a content creator
+  /// Uses the new cache-first endpoint as single source of truth
+  static Future<bool> isContentCreator() async {
+    try {
+      // Use the new cache-first endpoint
+      return await isContentCreatorNew();
+    } catch (e) {
+      print('🔍 DEBUG: Error checking content creator status: $e');
+      return false;
+    }
+  }
+
+  /// Check if user has active subscription
+  static Future<bool> hasActiveSubscription() async {
+    try {
+      final result = await getMySubscription();
+      if (result.isSuccess && result.data != null) {
+        // Check if subscription is active
+        return result.data!.subscriptionStatusName == 'Active';
+      }
+      return false;
+    } catch (e) {
+      print('🔍 DEBUG: Error checking subscription status: $e');
+      return false;
+    }
+  }
+
+  /// Logout and clear tokens
+  static Future<ApiResult<dynamic>> logout() async {
+    try {
+      final url = Uri.parse('$_authUrl/logout');
+      final headers = await _getAuthHeaders();
+
+      final response = await http
+          .post(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      final jsonResponse = jsonDecode(response.body);
+
+      // Clear tokens regardless of API response
+      await TokenManager.instance.clearToken();
+
+      return ApiResult.fromJson(jsonResponse, (data) => null);
+    } catch (e) {
+      // Clear tokens even if API call fails
+      await TokenManager.instance.clearToken();
+      return ApiResult(
+        isSuccess: false,
+        message: 'Logout error: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Check if user can access podcast content
+  /// Returns true if user has active subscription OR is content creator
+  static Future<bool> canAccessPodcastContent() async {
+    try {
+      // Check both conditions in parallel for better performance
+      final results = await Future.wait([
+        hasActiveSubscription(),
+        isContentCreator(),
+      ]);
+
+      final hasSubscription = results[0];
+      final isCreator = results[1];
+
+      print('🔍 DEBUG: Subscription: $hasSubscription, Creator: $isCreator');
+
+      // User can access if they have subscription OR is content creator
+      return hasSubscription || isCreator;
+    } catch (e) {
+      print('🔍 DEBUG: Error checking podcast access: $e');
+      return false;
+    }
+  }
+
+  /// Get AI-powered podcast recommendations for current user
+  static Future<ApiResult<PodcastRecommendationResponse>> getMyRecommendations({
+    int? limit,
+    bool? includeListened,
+  }) async {
+    final queryParams = <String, String>{};
+    if (limit != null) {
+      queryParams['limit'] = limit.toString();
+    }
+    if (includeListened != null) {
+      queryParams['includeListened'] = includeListened.toString();
+    }
+
+    final url = Uri.parse(
+      '$_recommendationsUrl/me',
+    ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+    print('🤖 DEBUG: Calling AI recommendations API: $url');
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      print(
+        '🤖 DEBUG: AI recommendations response status: ${response.statusCode}',
+      );
+      print('🤖 DEBUG: AI recommendations response body: ${response.body}');
+
+      if (response.statusCode != 200) {
+        return ApiResult<PodcastRecommendationResponse>(
+          isSuccess: false,
+          message: 'Lỗi ${response.statusCode} khi lấy đề xuất AI',
+        );
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      return ApiResult.fromJson(
+        jsonResponse,
+        (dataJson) => PodcastRecommendationResponse.fromJson(
+          dataJson as Map<String, dynamic>,
+        ),
+      );
+    } catch (e) {
+      print('🤖 DEBUG: AI recommendations error: $e');
+      return ApiResult<PodcastRecommendationResponse>(
+        isSuccess: false,
+        message: 'Lỗi: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Get user state from cache with fallback to identity service
+  /// This is the single source of truth for user information
+  static Future<ApiResult<UserStateResponse>> getUserState() async {
+    final url = Uri.parse(_userStateUrl);
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
+
+      final jsonResponse = jsonDecode(response.body);
+      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi tải thông tin người dùng',
+        );
+      }
+
+      return ApiResult.fromJson(
+        jsonResponse,
+        (dataJson) =>
+            UserStateResponse.fromJson(dataJson as Map<String, dynamic>),
+      );
+    } catch (e) {
+      print('❌ DEBUG: Error getting user state: $e');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Lỗi kết nối: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Check if user is content creator using cache-first approach
+  /// This is the single source of truth for content creator status
+  static Future<ApiResult<ContentCreatorStatusResponse>>
+  checkContentCreatorStatus() async {
+    final url = Uri.parse(_isContentCreatorUrl);
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
+
+      final jsonResponse = jsonDecode(response.body);
+      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
+        return ApiResult(
+          isSuccess: false,
+          message:
+              jsonResponse['message'] ??
+              'Lỗi kiểm tra trạng thái content creator',
+        );
+      }
+
+      return ApiResult.fromJson(
+        jsonResponse,
+        (dataJson) => ContentCreatorStatusResponse.fromJson(
+          dataJson as Map<String, dynamic>,
+        ),
+      );
+    } catch (e) {
+      print('❌ DEBUG: Error checking content creator status: $e');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Lỗi kết nối: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Check if user is content creator (simplified boolean version)
+  /// Uses the new cache-first endpoint
+  static Future<bool> isContentCreatorNew() async {
+    try {
+      final result = await checkContentCreatorStatus();
+      if (result.isSuccess && result.data != null) {
+        print(
+          '🔍 DEBUG: Content creator status: ${result.data!.isContentCreator} (source: ${result.data!.source})',
+        );
+        return result.data!.isContentCreator;
+      }
+      print(
+        '❌ DEBUG: Failed to check content creator status: ${result.message}',
+      );
+      return false;
+    } catch (e) {
+      print('❌ DEBUG: Error checking content creator status: $e');
+      return false;
+    }
+  }
 }
