@@ -1,7 +1,7 @@
   import 'dart:async';
   import 'package:flutter/material.dart';
   import '../models/SubscriptionPlan.dart';
-  import '../models/SubscriptionPlanFilters.dart';
+  import '../providers/SubscriptionPlanFilters.dart';
   import '../services/api_service.dart';
   import '../utils/app_colors.dart';
   import 'CreateSubscriptionScreen.dart';

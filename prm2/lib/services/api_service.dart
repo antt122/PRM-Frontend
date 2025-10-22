@@ -12,7 +12,7 @@ import '../models/CreatorApplicationDetail.dart';
 import '../models/CreatorApplicationListItem.dart';
 import '../models/LoginData.dart';
 import '../models/PaginatedResult.dart';
-import '../models/SubscriptionFilters.dart';
+import '../providers/SubscriptionFilters.dart';
 import '../models/UpdatePlanRequest.dart';
 import '../models/UpdateUserResponse.dart';
 import '../models/UserDetail.dart';
@@ -23,7 +23,7 @@ import '../models/ApiResult.dart';
 
 import '../models/Subscription.dart';
 import '../models/SubscriptionPlan.dart';
-import '../models/SubscriptionPlanFilters.dart';
+import '../providers/SubscriptionPlanFilters.dart';
 import '../models/UpdateSubscriptionRequest.dart';
 class ApiService {
   // --- CÁC URL ĐƯỢC CHUYỂN THÀNH GETTER ĐỂ TRÁNH RACE CONDITION ---
