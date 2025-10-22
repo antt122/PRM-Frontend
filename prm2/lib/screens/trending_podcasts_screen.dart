@@ -5,6 +5,7 @@ import '../models/pagination_result.dart';
 import '../services/api_service.dart';
 import '../components/podcast_card.dart';
 import '../components/podcast_list_item.dart';
+import '../components/access_denied_widget.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_fonts.dart';
 
@@ -21,21 +22,54 @@ class _TrendingPodcastsScreenState extends State<TrendingPodcastsScreen> {
   bool _isLoadingMore = false;
   int _currentPage = 1;
   bool _isGridView = true;
+  bool _hasLoaded = false;
+  bool _hasAccess = false;
+  bool _isCheckingAccess = true;
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    // Always load fresh data when screen is created
-    _loadTrendingPodcasts();
+    // Check access first
+    _checkAccess();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Always refresh data when screen becomes visible
-    _loadTrendingPodcasts();
+    // Only load data when screen becomes visible for the first time AND has access
+    if (!_hasLoaded && _hasAccess) {
+      _hasLoaded = true;
+      _loadTrendingPodcasts();
+    }
+  }
+
+  Future<void> _checkAccess() async {
+    setState(() => _isCheckingAccess = true);
+
+    try {
+      final hasAccess = await ApiService.canAccessPodcastContent();
+      if (mounted) {
+        setState(() {
+          _hasAccess = hasAccess;
+          _isCheckingAccess = false;
+        });
+
+        // If has access, load data immediately
+        if (_hasAccess && !_hasLoaded) {
+          _hasLoaded = true;
+          _loadTrendingPodcasts();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasAccess = false;
+          _isCheckingAccess = false;
+        });
+      }
+    }
   }
 
   @override
@@ -72,6 +106,12 @@ class _TrendingPodcastsScreenState extends State<TrendingPodcastsScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _onRefresh() async {
+    // Reset to first page and reload latest data
+    _currentPage = 1;
+    await _loadTrendingPodcasts();
   }
 
   Future<void> _loadMore() async {
@@ -161,7 +201,41 @@ class _TrendingPodcastsScreenState extends State<TrendingPodcastsScreen> {
             colors: [kBackgroundColor, kSurfaceColor],
           ),
         ),
-        child: _isLoading
+        child: _isCheckingAccess
+            ? Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: kGlassBackground,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kGlassBorder, width: 0.5),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(
+                            color: kPrimaryTextColor,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Đang kiểm tra quyền truy cập...',
+                            style: AppFonts.body.copyWith(
+                              color: kPrimaryTextColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : !_hasAccess
+            ? const AccessDeniedWidget()
+            : _isLoading
             ? Center(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -213,18 +287,26 @@ class _TrendingPodcastsScreenState extends State<TrendingPodcastsScreen> {
                       ),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: kGlassBackground,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(20),
-                              topRight: Radius.circular(20),
+                        child: RefreshIndicator(
+                          onRefresh: _onRefresh,
+                          color: kPrimaryTextColor,
+                          backgroundColor: Colors.black54,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: kGlassBackground,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                topRight: Radius.circular(20),
+                              ),
+                              border: Border.all(
+                                color: kGlassBorder,
+                                width: 0.5,
+                              ),
                             ),
-                            border: Border.all(color: kGlassBorder, width: 0.5),
+                            child: _isGridView
+                                ? _buildGridView()
+                                : _buildListView(),
                           ),
-                          child: _isGridView
-                              ? _buildGridView()
-                              : _buildListView(),
                         ),
                       ),
                     ),

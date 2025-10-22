@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../screens/login_screen.dart';
 import '../screens/my_subscription_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/creator_dashboard_screen.dart';
 import '../screens/creator_application_screen.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -72,18 +71,9 @@ class _AppDrawerState extends State<AppDrawer> {
     }
   }
 
-  // Hàm xử lý đăng xuất
+  // Hàm xử lý đăng xuất sử dụng AuthService
   Future<void> _logout(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Clear all stored data
-
-    if (!context.mounted) return;
-
-    // Điều hướng về màn hình Login và xóa tất cả các màn hình cũ
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (Route<dynamic> route) => false,
-    );
+    await AuthService.instance.logout();
   }
 
   @override

@@ -74,6 +74,27 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen>
     });
   }
 
+  Future<void> _onRefresh() async {
+    // Refresh based on current tab
+    switch (_tabController.index) {
+      case 0: // My Podcasts
+        _currentPage = 1;
+        _loadPodcasts();
+        await _podcastsFuture;
+        break;
+      case 1: // Upload
+        _loadStats();
+        await _statsFuture;
+        break;
+      case 2: // Statistics
+        _loadStats();
+        await _statsFuture;
+        break;
+      default:
+        break;
+    }
+  }
+
   List<Podcast> _getFilteredPodcasts(List<Podcast> podcasts) {
     return podcasts.where((podcast) {
       // Search filter
@@ -426,12 +447,17 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen>
 
             // Podcast list
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: filteredPodcasts.length,
-                itemBuilder: (context, index) {
-                  return _buildPodcastCard(filteredPodcasts[index]);
-                },
+              child: RefreshIndicator(
+                onRefresh: _onRefresh,
+                color: kPrimaryTextColor,
+                backgroundColor: Colors.black54,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredPodcasts.length,
+                  itemBuilder: (context, index) {
+                    return _buildPodcastCard(filteredPodcasts[index]);
+                  },
+                ),
               ),
             ),
 
@@ -554,56 +580,62 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen>
                 ? podcastsSnapshot.data!.items
                 : <Podcast>[];
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // KPI Cards
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    childAspectRatio: 1.5,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    children: [
-                      DashboardStatsCard(
-                        title: 'Tổng podcast',
-                        value: stats.totalPodcasts,
-                        icon: Icons.podcasts,
-                        color: kAccentColor,
-                      ),
-                      DashboardStatsCard(
-                        title: 'Đã xuất bản',
-                        value: stats.publishedPodcasts,
-                        icon: Icons.published_with_changes,
-                        color: Colors.green,
-                      ),
-                      DashboardStatsCard(
-                        title: 'Chờ duyệt',
-                        value: stats.pendingPodcasts,
-                        icon: Icons.schedule,
-                        color: Colors.orange,
-                      ),
-                      DashboardStatsCard(
-                        title: 'Tổng lượt nghe',
-                        value: stats.totalViews,
-                        icon: Icons.visibility,
-                        color: Colors.blue,
-                      ),
-                    ],
-                  ),
+            return RefreshIndicator(
+              onRefresh: _onRefresh,
+              color: kPrimaryTextColor,
+              backgroundColor: Colors.black54,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // KPI Cards
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 1.5,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      children: [
+                        DashboardStatsCard(
+                          title: 'Tổng podcast',
+                          value: stats.totalPodcasts,
+                          icon: Icons.podcasts,
+                          color: kAccentColor,
+                        ),
+                        DashboardStatsCard(
+                          title: 'Đã xuất bản',
+                          value: stats.publishedPodcasts,
+                          icon: Icons.published_with_changes,
+                          color: Colors.green,
+                        ),
+                        DashboardStatsCard(
+                          title: 'Chờ duyệt',
+                          value: stats.pendingPodcasts,
+                          icon: Icons.schedule,
+                          color: Colors.orange,
+                        ),
+                        DashboardStatsCard(
+                          title: 'Tổng lượt nghe',
+                          value: stats.totalViews,
+                          icon: Icons.visibility,
+                          color: Colors.blue,
+                        ),
+                      ],
+                    ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Charts
-                  TopPodcastsChart(topPodcasts: stats.topPodcasts),
+                    // Charts
+                    TopPodcastsChart(topPodcasts: stats.topPodcasts),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  MonthlyTrendChart(podcasts: podcasts),
-                ],
+                    MonthlyTrendChart(podcasts: podcasts),
+                  ],
+                ),
               ),
             );
           },

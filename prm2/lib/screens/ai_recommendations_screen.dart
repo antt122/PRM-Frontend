@@ -4,6 +4,7 @@ import '../models/podcast.dart';
 import '../services/api_service.dart';
 import '../components/podcast_card.dart';
 import '../components/podcast_list_item.dart';
+import '../components/access_denied_widget.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_fonts.dart';
 
@@ -19,19 +20,52 @@ class _AIRecommendationsScreenState extends State<AIRecommendationsScreen> {
   List<Podcast> _aiRecommendations = [];
   bool _isLoading = false;
   bool _isGridView = true;
+  bool _hasLoaded = false;
+  bool _hasAccess = false;
+  bool _isCheckingAccess = true;
 
   @override
   void initState() {
     super.initState();
-    // Always load fresh data when screen is created
-    _loadAIRecommendations();
+    // Check access first
+    _checkAccess();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Always refresh data when screen becomes visible
-    _loadAIRecommendations();
+    // Only load data when screen becomes visible for the first time AND has access
+    if (!_hasLoaded && _hasAccess) {
+      _hasLoaded = true;
+      _loadAIRecommendations();
+    }
+  }
+
+  Future<void> _checkAccess() async {
+    setState(() => _isCheckingAccess = true);
+
+    try {
+      final hasAccess = await ApiService.canAccessPodcastContent();
+      if (mounted) {
+        setState(() {
+          _hasAccess = hasAccess;
+          _isCheckingAccess = false;
+        });
+
+        // If has access, load data immediately
+        if (_hasAccess && !_hasLoaded) {
+          _hasLoaded = true;
+          _loadAIRecommendations();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasAccess = false;
+          _isCheckingAccess = false;
+        });
+      }
+    }
   }
 
   Future<List<Podcast>> _loadAIRecommendations() async {
@@ -235,6 +269,10 @@ class _AIRecommendationsScreenState extends State<AIRecommendationsScreen> {
     }
   }
 
+  Future<void> _onRefresh() async {
+    await _loadAIRecommendations();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -282,7 +320,41 @@ class _AIRecommendationsScreenState extends State<AIRecommendationsScreen> {
             colors: [kBackgroundColor, kSurfaceColor],
           ),
         ),
-        child: _isLoading
+        child: _isCheckingAccess
+            ? Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: kGlassBackground,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kGlassBorder, width: 0.5),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(
+                            color: kPrimaryTextColor,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Đang kiểm tra quyền truy cập...',
+                            style: AppFonts.body.copyWith(
+                              color: kPrimaryTextColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : !_hasAccess
+            ? const AccessDeniedWidget()
+            : _isLoading
             ? Center(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -412,18 +484,26 @@ class _AIRecommendationsScreenState extends State<AIRecommendationsScreen> {
                       ),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: kGlassBackground,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(20),
-                              topRight: Radius.circular(20),
+                        child: RefreshIndicator(
+                          onRefresh: _onRefresh,
+                          color: kPrimaryTextColor,
+                          backgroundColor: Colors.black54,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: kGlassBackground,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                topRight: Radius.circular(20),
+                              ),
+                              border: Border.all(
+                                color: kGlassBorder,
+                                width: 0.5,
+                              ),
                             ),
-                            border: Border.all(color: kGlassBorder, width: 0.5),
+                            child: _isGridView
+                                ? _buildGridView()
+                                : _buildListView(),
                           ),
-                          child: _isGridView
-                              ? _buildGridView()
-                              : _buildListView(),
                         ),
                       ),
                     ),

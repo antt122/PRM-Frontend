@@ -24,6 +24,8 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
   void _parsePaymentResult() {
     if (widget.queryParams != null) {
       print('🔍 Payment result params: ${widget.queryParams}');
+    } else {
+      print('❌ No query params provided to PaymentResultScreen');
     }
   }
 
@@ -74,8 +76,12 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
           ),
           child: IconButton(
             icon: const Icon(Icons.close, color: kPrimaryTextColor),
-            onPressed: () =>
-                Navigator.of(context).popUntil((route) => route.isFirst),
+            onPressed: () {
+              // Navigate to home screen
+              Navigator.of(
+                context,
+              ).pushNamedAndRemoveUntil('/', (route) => false);
+            },
           ),
         ),
         title: Container(
@@ -245,10 +251,11 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                               width: double.infinity,
                               child: ElevatedButton(
                                 onPressed: () {
-                                  // Navigate to podcast screen
-                                  Navigator.of(
-                                    context,
-                                  ).popUntil((route) => route.isFirst);
+                                  // Navigate to search screen
+                                  Navigator.of(context).pushNamedAndRemoveUntil(
+                                    '/search',
+                                    (route) => false,
+                                  );
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: kAccentColor,
@@ -273,10 +280,11 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                               width: double.infinity,
                               child: OutlinedButton(
                                 onPressed: () {
-                                  // Navigate to profile screen
-                                  Navigator.of(
-                                    context,
-                                  ).popUntil((route) => route.isFirst);
+                                  // Navigate to my subscription screen
+                                  Navigator.of(context).pushNamedAndRemoveUntil(
+                                    '/my-subscription',
+                                    (route) => false,
+                                  );
                                 },
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(
@@ -291,7 +299,7 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                                   ),
                                 ),
                                 child: Text(
-                                  'Xem hồ sơ của tôi',
+                                  'Xem gói cước của tôi',
                                   style: AppFonts.title3.copyWith(
                                     color: kAccentColor,
                                     fontWeight: FontWeight.bold,
@@ -331,9 +339,10 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                               child: OutlinedButton(
                                 onPressed: () {
                                   // Navigate to home screen
-                                  Navigator.of(
-                                    context,
-                                  ).popUntil((route) => route.isFirst);
+                                  Navigator.of(context).pushNamedAndRemoveUntil(
+                                    '/',
+                                    (route) => false,
+                                  );
                                 },
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(
@@ -370,6 +379,36 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                         ),
                         textAlign: TextAlign.center,
                       ),
+
+                      const SizedBox(height: 16),
+
+                      // Debug: Test deep link button
+                      if (widget.queryParams == null ||
+                          widget.queryParams!.isEmpty)
+                        ElevatedButton(
+                          onPressed: () {
+                            // Test with sample payment result data
+                            final testParams = {
+                              'resultCode': '0',
+                              'orderId': 'test-order-123',
+                              'transId': 'test-trans-456',
+                              'amount': '50000',
+                              'message': 'Success',
+                              'responseTime': DateTime.now()
+                                  .millisecondsSinceEpoch
+                                  .toString(),
+                            };
+
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (context) => PaymentResultScreen(
+                                  queryParams: testParams,
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text('Test Payment Result'),
+                        ),
                     ],
                   ),
                 ),

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart';
 
 // Import các file constants và các component đã được chia nhỏ
 import '../utils/app_colors.dart';
@@ -14,20 +12,6 @@ import '../components/app_drawer_enhanced.dart'; // Import AppDrawer Enhanced v�
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  // Logic logout không thay đổi
-  Future<void> _logout(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('accessToken');
-
-    if (context.mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,19 +57,7 @@ class HomeScreen extends StatelessWidget {
         ),
         centerTitle: true,
         actions: [
-          Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: kGlassBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kGlassBorder, width: 0.5),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.logout_outlined, color: kPrimaryTextColor),
-              tooltip: 'Đăng xuất',
-              onPressed: () => _logout(context),
-            ),
-          ),
+          // Removed logout button - logout is now handled through AppDrawer
         ],
       ),
       body: Container(
@@ -96,73 +68,81 @@ class HomeScreen extends StatelessWidget {
             colors: [kBackgroundColor, kSurfaceColor],
           ),
         ),
-        child: CustomScrollView(
-          slivers: [
-            // Add top padding for status bar
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-            // Hero section with liquid glass
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: kGlassBackground,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: kGlassBorder, width: 0.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: kGlassShadow,
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const HeroSection(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // Other sections with liquid glass
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: kGlassBackground,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: kGlassBorder, width: 0.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: kGlassShadow,
-                            blurRadius: 15,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Column(
-                        children: [
-                          MindfulnessHighlights(),
-                          CommunitySection(),
-                          PricingSection(),
-                        ],
+        child: RefreshIndicator(
+          onRefresh: () async {
+            // HomeScreen không gọi API podcast; giữ chỗ để tương lai cập nhật section nếu cần
+            await Future<void>.delayed(const Duration(milliseconds: 400));
+          },
+          color: kPrimaryTextColor,
+          backgroundColor: Colors.black54,
+          child: CustomScrollView(
+            slivers: [
+              // Add top padding for status bar
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              // Hero section with liquid glass
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.all(16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: kGlassBackground,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: kGlassBorder, width: 0.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: kGlassShadow,
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const HeroSection(),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            // Bottom padding
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ],
+              // Other sections with liquid glass
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: kGlassBackground,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: kGlassBorder, width: 0.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: kGlassShadow,
+                              blurRadius: 15,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Column(
+                          children: [
+                            MindfulnessHighlights(),
+                            CommunitySection(),
+                            PricingSection(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Bottom padding
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            ],
+          ),
         ),
       ),
     );

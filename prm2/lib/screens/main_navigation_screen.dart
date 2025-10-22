@@ -16,20 +16,43 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  final Map<int, Widget> _screenCache = {};
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const TrendingPodcastsScreen(),
-    const LatestPodcastsScreen(),
-    const AIRecommendationsScreen(),
-    const SearchPodcastsScreen(),
-  ];
+  Widget _getScreen(int index) {
+    if (_screenCache.containsKey(index)) {
+      return _screenCache[index]!;
+    }
+
+    Widget screen;
+    switch (index) {
+      case 0:
+        screen = const HomeScreen();
+        break;
+      case 1:
+        screen = const TrendingPodcastsScreen();
+        break;
+      case 2:
+        screen = const LatestPodcastsScreen();
+        break;
+      case 3:
+        screen = const AIRecommendationsScreen();
+        break;
+      case 4:
+        screen = const SearchPodcastsScreen();
+        break;
+      default:
+        screen = const HomeScreen();
+    }
+
+    _screenCache[index] = screen;
+    return screen;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true, // Cần thiết để hiệu ứng liquid glass hoạt động
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: _getScreen(_currentIndex),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

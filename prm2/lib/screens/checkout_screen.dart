@@ -598,6 +598,13 @@ class _PaymentWebViewState extends State<_PaymentWebView> {
           onNavigationRequest: (NavigationRequest request) {
             print('🔗 Navigation request: ${request.url}');
 
+            // ✅ Handle custom scheme deep links (healink://)
+            if (request.url.startsWith('healink://')) {
+              print('📱 Custom scheme deep link detected: ${request.url}');
+              _handleCustomScheme(request.url);
+              return NavigationDecision.prevent;
+            }
+
             // ✅ Handle momo:// scheme
             if (request.url.startsWith('momo://')) {
               print('📱 MoMo scheme detected: ${request.url}');
@@ -729,6 +736,22 @@ class _PaymentWebViewState extends State<_PaymentWebView> {
     } catch (e) {
       print('❌ Error handling MoMo scheme: $e');
       _showMomoFallback(momoUrl);
+    }
+  }
+
+  /// ✅ Handle custom scheme deep links (healink://)
+  Future<void> _handleCustomScheme(String customUrl) async {
+    try {
+      print('🔗 Handling custom scheme: $customUrl');
+
+      // Close WebView immediately
+      Navigator.of(context).pop();
+
+      // The deep link will be handled by main.dart automatically
+      // No need to launch it manually
+      print('✅ WebView closed, deep link will be handled by main.dart');
+    } catch (e) {
+      print('❌ Error handling custom scheme: $e');
     }
   }
 

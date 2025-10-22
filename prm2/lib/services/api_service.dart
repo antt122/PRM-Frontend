@@ -10,7 +10,6 @@ import 'package:http_parser/http_parser.dart';
 import '../models/my_subscription.dart';
 import '../models/payment_method.dart';
 import '../models/subscription_registration_response.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/api_result.dart';
 import '../models/creator_application.dart';
 import '../models/creator_application_status.dart';
@@ -22,7 +21,10 @@ import '../models/podcast.dart';
 import '../models/pagination_result.dart';
 import '../models/podcast_category.dart';
 import '../models/podcast_recommendation.dart';
+import '../models/user_state_response.dart';
 import '../models/creator_dashboard_stats.dart';
+import 'token_manager.dart';
+import 'auth_service.dart';
 
 class ApiService {
   // --- CÁC URL ĐƯỢC CHUYỂN THÀNH GETTER ĐỂ TRÁNH RACE CONDITION ---
@@ -45,6 +47,9 @@ class ApiService {
   static String get _creatorApplicationUrl => '$_userUrl/CreatorApplications';
   static String get _creatorStatusUrl =>
       '$_userUrl/CreatorApplications/my-status';
+  static String get _userStateUrl => '$_userUrl/state/me';
+  static String get _isContentCreatorUrl =>
+      '$_userUrl/state/is-content-creator';
   static String get _creatorPodcastsUrl => '$_baseUrl/content/creator/podcasts';
   static String get _createPodcastUrl => '$_baseUrl/content/creator/podcasts';
   static String get _userPodcastsUrl => '$_baseUrl/content/user/podcasts';
@@ -52,8 +57,8 @@ class ApiService {
 
   // --- HÀM HELPER MỚI ĐỂ LẤY HEADER CÓ TOKEN ---
   static Future<Map<String, String>> _getAuthHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
+    // Get current token from TokenManager
+    final currentToken = TokenManager.instance.accessToken;
 
     final headers = {
       'Content-Type': 'application/json',
@@ -62,11 +67,19 @@ class ApiService {
       'User-Agent': 'Flutter-Client', // Identify as non-browser for ngrok
     };
 
-    if (token != null) {
-      headers['Authorization'] = 'Bearer $token';
+    if (currentToken != null) {
+      headers['Authorization'] = 'Bearer $currentToken';
     }
 
     return headers;
+  }
+
+  // --- HÀM HELPER ĐỂ CHECK 401 VÀ HANDLE UNAUTHORIZED ---
+  static Future<void> _handleHttpResponse(http.Response response) async {
+    if (response.statusCode == 401) {
+      print('🔒 ApiService: 401 Unauthorized detected, triggering logout');
+      await AuthService.instance.handleUnauthorized();
+    }
   }
 
   // ========================================================================
@@ -80,6 +93,9 @@ class ApiService {
       final response = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
 
       final jsonResponse = jsonDecode(response.body);
       if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
@@ -708,10 +724,20 @@ class ApiService {
 
       final jsonResponse = jsonDecode(response.body);
 
-      return ApiResult.fromJson(
+      final result = ApiResult.fromJson(
         jsonResponse,
         (dataJson) => LoginData.fromJson(dataJson as Map<String, dynamic>),
       );
+
+      // Initialize TokenManager after successful login
+      if (result.isSuccess && result.data != null) {
+        await TokenManager.instance.updateToken(
+          result.data!.accessToken,
+          DateTime.parse(result.data!.expiresAt),
+        );
+      }
+
+      return result;
     } on TimeoutException {
       return ApiResult(isSuccess: false, message: 'Request timed out.');
     } on http.ClientException catch (e) {
@@ -734,6 +760,10 @@ class ApiService {
       final response = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
+
       final jsonResponse = jsonDecode(response.body);
 
       if (response.statusCode == 401) {
@@ -801,6 +831,9 @@ class ApiService {
       final response = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
 
       if (response.statusCode == 404) {
         return ApiResult(
@@ -1494,6 +1527,82 @@ class ApiService {
     }
   }
 
+  /// Check if user is a content creator
+  /// Uses the new cache-first endpoint as single source of truth
+  static Future<bool> isContentCreator() async {
+    try {
+      // Use the new cache-first endpoint
+      return await isContentCreatorNew();
+    } catch (e) {
+      print('🔍 DEBUG: Error checking content creator status: $e');
+      return false;
+    }
+  }
+
+  /// Check if user has active subscription
+  static Future<bool> hasActiveSubscription() async {
+    try {
+      final result = await getMySubscription();
+      if (result.isSuccess && result.data != null) {
+        // Check if subscription is active
+        return result.data!.subscriptionStatusName == 'Active';
+      }
+      return false;
+    } catch (e) {
+      print('🔍 DEBUG: Error checking subscription status: $e');
+      return false;
+    }
+  }
+
+  /// Logout and clear tokens
+  static Future<ApiResult<dynamic>> logout() async {
+    try {
+      final url = Uri.parse('$_authUrl/logout');
+      final headers = await _getAuthHeaders();
+
+      final response = await http
+          .post(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      final jsonResponse = jsonDecode(response.body);
+
+      // Clear tokens regardless of API response
+      await TokenManager.instance.clearToken();
+
+      return ApiResult.fromJson(jsonResponse, (data) => null);
+    } catch (e) {
+      // Clear tokens even if API call fails
+      await TokenManager.instance.clearToken();
+      return ApiResult(
+        isSuccess: false,
+        message: 'Logout error: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Check if user can access podcast content
+  /// Returns true if user has active subscription OR is content creator
+  static Future<bool> canAccessPodcastContent() async {
+    try {
+      // Check both conditions in parallel for better performance
+      final results = await Future.wait([
+        hasActiveSubscription(),
+        isContentCreator(),
+      ]);
+
+      final hasSubscription = results[0];
+      final isCreator = results[1];
+
+      print('🔍 DEBUG: Subscription: $hasSubscription, Creator: $isCreator');
+
+      // User can access if they have subscription OR is content creator
+      return hasSubscription || isCreator;
+    } catch (e) {
+      print('🔍 DEBUG: Error checking podcast access: $e');
+      return false;
+    }
+  }
+
   /// Get AI-powered podcast recommendations for current user
   static Future<ApiResult<PodcastRecommendationResponse>> getMyRecommendations({
     int? limit,
@@ -1544,6 +1653,101 @@ class ApiService {
         isSuccess: false,
         message: 'Lỗi: ${e.toString()}',
       );
+    }
+  }
+
+  /// Get user state from cache with fallback to identity service
+  /// This is the single source of truth for user information
+  static Future<ApiResult<UserStateResponse>> getUserState() async {
+    final url = Uri.parse(_userStateUrl);
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
+
+      final jsonResponse = jsonDecode(response.body);
+      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
+        return ApiResult(
+          isSuccess: false,
+          message: jsonResponse['message'] ?? 'Lỗi tải thông tin người dùng',
+        );
+      }
+
+      return ApiResult.fromJson(
+        jsonResponse,
+        (dataJson) =>
+            UserStateResponse.fromJson(dataJson as Map<String, dynamic>),
+      );
+    } catch (e) {
+      print('❌ DEBUG: Error getting user state: $e');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Lỗi kết nối: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Check if user is content creator using cache-first approach
+  /// This is the single source of truth for content creator status
+  static Future<ApiResult<ContentCreatorStatusResponse>>
+  checkContentCreatorStatus() async {
+    final url = Uri.parse(_isContentCreatorUrl);
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      // Check for 401 and handle unauthorized
+      await _handleHttpResponse(response);
+
+      final jsonResponse = jsonDecode(response.body);
+      if (response.statusCode != 200 || !(jsonResponse['isSuccess'] ?? false)) {
+        return ApiResult(
+          isSuccess: false,
+          message:
+              jsonResponse['message'] ??
+              'Lỗi kiểm tra trạng thái content creator',
+        );
+      }
+
+      return ApiResult.fromJson(
+        jsonResponse,
+        (dataJson) => ContentCreatorStatusResponse.fromJson(
+          dataJson as Map<String, dynamic>,
+        ),
+      );
+    } catch (e) {
+      print('❌ DEBUG: Error checking content creator status: $e');
+      return ApiResult(
+        isSuccess: false,
+        message: 'Lỗi kết nối: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Check if user is content creator (simplified boolean version)
+  /// Uses the new cache-first endpoint
+  static Future<bool> isContentCreatorNew() async {
+    try {
+      final result = await checkContentCreatorStatus();
+      if (result.isSuccess && result.data != null) {
+        print(
+          '🔍 DEBUG: Content creator status: ${result.data!.isContentCreator} (source: ${result.data!.source})',
+        );
+        return result.data!.isContentCreator;
+      }
+      print(
+        '❌ DEBUG: Failed to check content creator status: ${result.message}',
+      );
+      return false;
+    } catch (e) {
+      print('❌ DEBUG: Error checking content creator status: $e');
+      return false;
     }
   }
 }
