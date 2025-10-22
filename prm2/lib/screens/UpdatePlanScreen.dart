@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/SubscriptionPlan.dart'; // Giả sử model này tồn tại
 import '../models/UpdatePlanRequest.dart'; // Model bạn đã cung cấp
-import '../services/api_service.dart'; // Giả sử service này tồn tại
+import '../services/SubscriptionPlanService.dart'; // Giả sử service này tồn tại
 
 class UpdateSubscriptionPlanScreen extends StatefulWidget {
   final SubscriptionPlan initialPlan;
@@ -15,7 +15,7 @@ class UpdateSubscriptionPlanScreen extends StatefulWidget {
 
 class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _apiService = ApiService();
+  final _apiService = SubscriptionPlanService();
   bool _isLoading = false;
 
   // Controllers cho TẤT CẢ các trường

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/SubscriptionPlan.dart';
-import '../services/api_service.dart';
+import '../services/SubscriptionPlanService.dart';
 import '../utils/app_colors.dart';
 import 'UpdatePlanScreen.dart';
 
@@ -15,7 +15,7 @@ class SubscriptionPlanDetailScreen extends StatefulWidget {
 }
 
 class _SubscriptionPlanDetailScreenState extends State<SubscriptionPlanDetailScreen> {
-  final ApiService _apiService = ApiService();
+  final SubscriptionPlanService _apiService = SubscriptionPlanService();
   bool _isLoading = true;
   String? _error;
   SubscriptionPlan? _plan;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/CreatePlanRequest.dart';
-import '../services/api_service.dart';
+import '../services/SubscriptionPlanService.dart';
 
 class CreateSubscriptionScreen extends StatefulWidget {
   const CreateSubscriptionScreen({super.key});
@@ -12,7 +12,7 @@ class CreateSubscriptionScreen extends StatefulWidget {
 
 class _CreatePlanScreenState extends State<CreateSubscriptionScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _apiService = ApiService();
+  final _apiService = SubscriptionPlanService();
   bool _isLoading = false;
 
   // Controllers cho các trường
