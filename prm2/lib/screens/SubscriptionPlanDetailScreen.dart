@@ -1,9 +1,76 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/SubscriptionPlan.dart';
-import '../services/api_service.dart';
+import '../services/SubscriptionPlanService.dart';
 import '../utils/app_colors.dart';
-import 'UpdatePlanScreen.dart';
+import 'UpdatePlanScreen.dart'; // Đổi tên file này nếu cần
+
+// --- WIDGET STATUSCHIP (Được thêm vào) ---
+// (Bạn có thể chuyển widget này sang file component riêng nếu muốn)
+class StatusChip extends StatelessWidget {
+  final String? status;
+
+  const StatusChip({Key? key, required this.status}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    Color dotColor;
+    String statusText;
+
+    // Logic màu sắc dựa trên status
+    switch (status?.toLowerCase()) {
+      case 'active':
+        dotColor = Colors.green;
+        statusText = 'Active';
+        break;
+      case 'inactive':
+        dotColor = Colors.red;
+        statusText = 'Inactive';
+        break;
+      case 'pending':
+        dotColor = Colors.orange; // Màu vàng (cam) cho Pending
+        statusText = 'Pending';
+        break;
+      default:
+      // Xử lý các trường hợp khác (null, rỗng, hoặc không xác định)
+        dotColor = Colors.grey;
+        statusText = (status == null || status!.isEmpty) ? 'Unknown' : status!;
+        // Viết hoa chữ cái đầu
+        statusText = statusText[0].toUpperCase() + statusText.substring(1);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        // Dùng màu nền mờ từ theme của bạn
+        color: kAdminInputBorderColor.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16), // Bo tròn
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min, // Chỉ chiếm không gian cần thiết
+        children: [
+          // Chấm tròn màu
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Chữ trạng thái
+          Text(
+            statusText,
+            style: const TextStyle(color: kAdminPrimaryTextColor, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+// --- KẾT THÚC WIDGET STATUSCHIP ---
+
 
 class SubscriptionPlanDetailScreen extends StatefulWidget {
   final String planId;
@@ -11,11 +78,13 @@ class SubscriptionPlanDetailScreen extends StatefulWidget {
   const SubscriptionPlanDetailScreen({super.key, required this.planId});
 
   @override
-  State<SubscriptionPlanDetailScreen> createState() => _SubscriptionPlanDetailScreenState();
+  State<SubscriptionPlanDetailScreen> createState() =>
+      _SubscriptionPlanDetailScreenState();
 }
 
-class _SubscriptionPlanDetailScreenState extends State<SubscriptionPlanDetailScreen> {
-  final ApiService _apiService = ApiService();
+class _SubscriptionPlanDetailScreenState
+    extends State<SubscriptionPlanDetailScreen> {
+  final SubscriptionPlanService _apiService = SubscriptionPlanService();
   bool _isLoading = true;
   String? _error;
   SubscriptionPlan? _plan;
@@ -169,8 +238,6 @@ class _PlanDetailCard extends StatelessWidget {
   final SubscriptionPlan plan;
   const _PlanDetailCard({required this.plan});
 
-  // --- SỬA LỖI: ĐIỀN LẠI NỘI DUNG CHO CÁC HÀM HELPER ---
-
   Widget _buildInfoRow(String label, String value, {bool isMono = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -203,8 +270,7 @@ class _PlanDetailCard extends StatelessWidget {
     );
   }
 
-  // -----------------------------------------------------------
-
+  // --- WIDGET BUILD CỦA CARD ĐÃ ĐƯỢC CẬP NHẬT ---
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -216,22 +282,43 @@ class _PlanDetailCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(plan.displayName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: kAdminPrimaryTextColor)),
-          const SizedBox(height: 8),
-          Text(plan.description ?? 'Không có mô tả', style: const TextStyle(fontSize: 16, color: kAdminSecondaryTextColor)),
-          const SizedBox(height: 16),
-          Chip(
-            label: Text(plan.isActive ? 'Đang hoạt động' : 'Không hoạt động'),
-            backgroundColor: (plan.isActive ? Colors.green : Colors.red).withOpacity(0.2),
-            labelStyle: TextStyle(color: plan.isActive ? Colors.green : Colors.red, fontWeight: FontWeight.bold),
+          // --- THAY ĐỔI: Thêm Row để chứa Title và Status Chip ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start, // Căn lề trên
+            children: [
+              // Title (bọc trong Expanded để không overflow)
+              Expanded(
+                child: Text(
+                  plan.displayName,
+                  style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: kAdminPrimaryTextColor),
+                ),
+              ),
+              const SizedBox(width: 16), // Khoảng cách
+              // Status Chip
+              StatusChip(status: plan.status),
+            ],
           ),
+          // --- KẾT THÚC THAY ĐỔI ---
+
+          const SizedBox(height: 8),
+          Text(plan.description ?? 'Không có mô tả',
+              style: const TextStyle(fontSize: 16, color: kAdminSecondaryTextColor)),
+
           const Divider(height: 32, color: kAdminInputBorderColor),
 
           _buildSectionHeader('Thông tin chung'),
           _buildInfoRow('Tên mã', plan.name),
           _buildInfoRow('Giá tiền', plan.formattedAmount),
+
+          // --- THAY ĐỔI: Đã xóa dòng _buildInfoRow('Trạng thái', plan.status) ---
+
           _buildInfoRow('Tiền tệ', plan.currency),
-          _buildInfoRow('Chu kỳ', '${plan.billingPeriodCount} ${plan.billingPeriodUnitName}'),
+          _buildInfoRow(
+              'Chu kỳ', '${plan.billingPeriodCount} ${plan.billingPeriodUnitName}'),
           _buildInfoRow('Ngày dùng thử', '${plan.trialDays ?? 0} ngày'),
 
           _buildSectionHeader('Thông tin định danh'),
@@ -240,7 +327,8 @@ class _PlanDetailCard extends StatelessWidget {
           _buildSectionHeader('Thông tin hệ thống'),
           _buildInfoRow('Ngày tạo', plan.formattedCreatedAt),
           if (plan.updatedAt != null)
-            _buildInfoRow('Cập nhật lần cuối', DateFormat('dd/MM/yyyy HH:mm').format(plan.updatedAt!)),
+            _buildInfoRow('Cập nhật lần cuối',
+                DateFormat('dd/MM/yyyy HH:mm').format(plan.updatedAt!)),
 
           _buildSectionHeader('Cấu hình tính năng (JSON)'),
           Container(
@@ -253,7 +341,8 @@ class _PlanDetailCard extends StatelessWidget {
             ),
             child: Text(
               plan.featureConfig ?? 'Không có cấu hình',
-              style: const TextStyle(color: kAdminSecondaryTextColor, fontFamily: 'monospace'),
+              style: const TextStyle(
+                  color: kAdminSecondaryTextColor, fontFamily: 'monospace'),
             ),
           ),
         ],

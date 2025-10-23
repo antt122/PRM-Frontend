@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/Subscription.dart';
-import '../models/SubscriptionFilters.dart';
+import '../providers/SubscriptionFilters.dart';
 import '../services/api_service.dart';
 
 // --- THAY ĐỔI 1: Thêm import cho màn hình chi tiết ---

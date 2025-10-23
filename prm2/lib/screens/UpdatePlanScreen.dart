@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/SubscriptionPlan.dart'; // Giả sử model này tồn tại
 import '../models/UpdatePlanRequest.dart'; // Model bạn đã cung cấp
-import '../services/api_service.dart'; // Giả sử service này tồn tại
+import '../services/SubscriptionPlanService.dart'; // Giả sử service này tồn tại
 
 class UpdateSubscriptionPlanScreen extends StatefulWidget {
   final SubscriptionPlan initialPlan;
@@ -15,7 +15,7 @@ class UpdateSubscriptionPlanScreen extends StatefulWidget {
 
 class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _apiService = ApiService();
+  final _apiService = SubscriptionPlanService();
   bool _isLoading = false;
 
   // Controllers cho TẤT CẢ các trường
@@ -27,7 +27,11 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
   late TextEditingController _billingPeriodCountController;
   late TextEditingController _amountController;
   late TextEditingController _trialDaysController;
+
+  // --- THAY ĐỔI 1: Controller cho status không còn cần thiết nữa (nhưng vẫn giữ để code cũ không lỗi) ---
   late TextEditingController _statusController;
+  // --- THAY ĐỔI 2: Thêm biến state mới cho Dropdown (kiểu int) ---
+  int? _selectedStatus;
 
   // State cho trường Dropdown (billingPeriodUnit)
   late int _selectedBillingUnit;
@@ -40,22 +44,16 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
     _displayNameController = TextEditingController(text: widget.initialPlan.displayName);
     _descriptionController = TextEditingController(text: widget.initialPlan.description);
 
-    // Giả sử initialPlan có các trường này, nếu không có, bạn cần thêm ?? ''
     _featureConfigController = TextEditingController(text: widget.initialPlan.featureConfig ?? '');
     _currencyController = TextEditingController(text: widget.initialPlan.currency ?? 'VND');
 
-    // Chuyển đổi số sang String cho Controllers
     _billingPeriodCountController = TextEditingController(text: widget.initialPlan.billingPeriodCount.toString());
     _amountController = TextEditingController(text: widget.initialPlan.amount.toString());
     _trialDaysController = TextEditingController(text: widget.initialPlan.trialDays?.toString() ?? '0');
 
-    // --- SỬA LỖI TẠI ĐÂY ---
-    // 'widget.initialPlan' không có 'status', nó có 'isActive' (kiểu bool)
-    // Chuyển đổi 'isActive' (bool) sang 'status' (dưới dạng String)
-    // (Giả sử 1 = Active, 0 = Inactive)
-    String initialStatusString = widget.initialPlan.isActive ? '1' : '0';
-    _statusController = TextEditingController(text: initialStatusString);
-    // -----------------------
+    // --- THAY ĐỔI 3: Khởi tạo biến _selectedStatus (int?) từ status (String) ---
+    _statusController = TextEditingController(text: widget.initialPlan.status);
+    _selectedStatus = int.tryParse(widget.initialPlan.status ?? '') ?? 1;    // ----------------------------------------------------
 
     // Khởi tạo giá trị Dropdown
     _selectedBillingUnit = widget.initialPlan.billingPeriodUnit;
@@ -80,7 +78,6 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isLoading = true; });
 
-    // Tạo request object, parse các giá trị từ String sang kiểu dữ liệu đúng
     final request = UpdatePlanRequest(
       name: _nameController.text.trim(),
       displayName: _displayNameController.text.trim(),
@@ -88,16 +85,13 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
       featureConfig: _featureConfigController.text.trim(),
       currency: _currencyController.text.trim(),
 
-      // Chuyển từ Text sang int?
       billingPeriodCount: int.tryParse(_billingPeriodCountController.text.trim()),
-      // Lấy từ state
       billingPeriodUnit: _selectedBillingUnit,
-      // Chuyển từ Text sang double?
       amount: double.tryParse(_amountController.text.trim()),
-      // Chuyển từ Text sang int?
       trialDays: int.tryParse(_trialDaysController.text.trim()),
-      // Chuyển từ Text sang int?
-      status: int.tryParse(_statusController.text.trim()),
+
+      // --- THAY ĐỔI 4: Sử dụng biến _selectedStatus (kiểu int?) trực tiếp ---
+      status: _selectedStatus,
     );
 
     final result = await _apiService.updateSubscriptionPlan(widget.initialPlan.id, request);
@@ -124,7 +118,8 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            // --- name (String) ---
+            // ... (Các TextFormField khác giữ nguyên) ...
+
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Tên mã (Name)'),
@@ -132,7 +127,6 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- displayName (String) ---
             TextFormField(
               controller: _displayNameController,
               decoration: const InputDecoration(labelText: 'Tên hiển thị (Display Name)'),
@@ -140,7 +134,6 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- description (String) ---
             TextFormField(
               controller: _descriptionController,
               decoration: const InputDecoration(labelText: 'Mô tả (Description)'),
@@ -149,7 +142,6 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- featureConfig (String) ---
             TextFormField(
               controller: _featureConfigController,
               decoration: const InputDecoration(labelText: 'Cấu hình tính năng (JSON string)'),
@@ -157,7 +149,6 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- currency (String) ---
             TextFormField(
               controller: _currencyController,
               decoration: const InputDecoration(labelText: 'Tiền tệ (Currency)'),
@@ -165,7 +156,6 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- amount (double) ---
             TextFormField(
               controller: _amountController,
               decoration: const InputDecoration(labelText: 'Giá tiền (Amount)'),
@@ -175,7 +165,6 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- billingPeriodCount (int) ---
             TextFormField(
               controller: _billingPeriodCountController,
               decoration: const InputDecoration(labelText: 'Số chu kỳ (Billing Period Count)'),
@@ -185,7 +174,6 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- billingPeriodUnit (int) ---
             DropdownButtonFormField<int>(
               value: _selectedBillingUnit,
               decoration: const InputDecoration(labelText: 'Đơn vị chu kỳ (Billing Period Unit)'),
@@ -197,7 +185,6 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- trialDays (int) ---
             TextFormField(
               controller: _trialDaysController,
               decoration: const InputDecoration(labelText: 'Số ngày dùng thử (Trial Days)'),
@@ -207,16 +194,33 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             ),
             const SizedBox(height: 16),
 
-            // --- status (int) ---
-            TextFormField(
-              controller: _statusController,
+            // --- THAY ĐỔI 5: Thay thế DropdownButtonFormField<String> bằng DropdownButtonFormField<int> ---
+            DropdownButtonFormField<int>(
+              // Sử dụng biến state int?
+              value: _selectedStatus,
               decoration: const InputDecoration(
-                  labelText: 'Trạng thái (Status)',
-                  hintText: '0=Inactive, 1=Active, 3=Pending...'
+                labelText: 'Trạng thái (Status)',
               ),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              validator: (v) => (v == null || v.isEmpty) ? 'Không được để trống' : null,
+              items: const [
+                DropdownMenuItem(
+                  value: 1, // Giá trị là int
+                  child: Text('1: Active (Hoạt động)'),
+                ),
+                DropdownMenuItem(
+                  value: 0, // Giá trị là int
+                  child: Text('0: Inactive (Không hoạt động)'),
+                ),
+              ],
+              onChanged: (int? newValue) {
+                // Cập nhật biến state int?
+                setState(() {
+                  _selectedStatus = newValue;
+                  // (Tùy chọn) Cập nhật controller cũ nếu bạn vẫn cần
+                  _statusController.text = newValue?.toString() ?? '';
+                });
+              },
+              // Validator kiểm tra null
+              validator: (v) => (v == null) ? 'Vui lòng chọn trạng thái' : null,
             ),
             const SizedBox(height: 32),
 

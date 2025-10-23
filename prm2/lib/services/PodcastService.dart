@@ -146,12 +146,35 @@ class PodcastService implements IPodcastService {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.post(uri, headers: headers, body: body);
+
+      // --- SỬA LỖI ---
+      // 1. Kiểm tra mã 204 NO CONTENT (Thành công, không có body)
+      // Đây là trường hợp thành công và không cần decode JSON.
+      if (response.statusCode == 204) {
+        return ApiResult(isSuccess: true, message: 'Từ chối thành công!');
+      }
+
+      // 2. Kiểm tra body rỗng cho các trường hợp khác (phòng hờ)
+      // Nếu body rỗng nhưng code không phải 204 (ví dụ: lỗi 500 rỗng)
+      if (response.body.isEmpty) {
+        final bool isSuccess = response.statusCode >= 200 && response.statusCode < 300;
+        return ApiResult(
+          isSuccess: isSuccess,
+          message: isSuccess ? 'Thao tác thành công!' : 'Lỗi ${response.statusCode} (No Content)',
+        );
+      }
+      // --- KẾT THÚC SỬA LỖI ---
+
+      // 3. Chỉ decode nếu body không rỗng và code không phải 204
+      // (Dùng cho các trường hợp trả về lỗi JSON, vd: 400, 401, 500)
       final jsonResponse = jsonDecode(response.body);
       return ApiResult(
-        isSuccess: jsonResponse['success'] ?? false,
-        message: jsonResponse['message'],
+        // Dùng 'success' nếu có, nếu không thì tự kiểm tra status code
+        isSuccess: jsonResponse['success'] ?? (response.statusCode >= 200 && response.statusCode < 300),
+        message: jsonResponse['message'] ?? 'Đã xảy ra lỗi.',
       );
     } catch (e) {
+      // Bắt lỗi network hoặc lỗi FormatException nếu logic trên bị sót
       return ApiResult(isSuccess: false, message: e.toString());
     }
   }
