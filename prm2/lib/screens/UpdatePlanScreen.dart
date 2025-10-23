@@ -35,16 +35,7 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
 
   // State cho trường Dropdown (billingPeriodUnit)
   late int _selectedBillingUnit;
-// Bên ngoài hàm build(), trong class State
-  int? _selectedStatus2;
 
-  @override
-  void initStatus() {
-    super.initState();
-    // Đặt giá trị mặc định là 1 (Active) khi widget khởi tạo
-    _selectedStatus2 = 1;
-  }
-  
   @override
   void initState() {
     super.initState();
@@ -62,8 +53,7 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
 
     // --- THAY ĐỔI 3: Khởi tạo biến _selectedStatus (int?) từ status (String) ---
     _statusController = TextEditingController(text: widget.initialPlan.status);
-    _selectedStatus = int.tryParse(widget.initialPlan.status);
-    // ----------------------------------------------------
+    _selectedStatus = int.tryParse(widget.initialPlan.status ?? '') ?? 1;    // ----------------------------------------------------
 
     // Khởi tạo giá trị Dropdown
     _selectedBillingUnit = widget.initialPlan.billingPeriodUnit;
@@ -207,7 +197,7 @@ class _UpdateSubscriptionPlanScreenState extends State<UpdateSubscriptionPlanScr
             // --- THAY ĐỔI 5: Thay thế DropdownButtonFormField<String> bằng DropdownButtonFormField<int> ---
             DropdownButtonFormField<int>(
               // Sử dụng biến state int?
-              value: _selectedStatus2,
+              value: _selectedStatus,
               decoration: const InputDecoration(
                 labelText: 'Trạng thái (Status)',
               ),

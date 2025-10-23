@@ -229,6 +229,7 @@ class _PlanDetailCard extends StatelessWidget {
           _buildSectionHeader('Thông tin chung'),
           _buildInfoRow('Tên mã', plan.name),
           _buildInfoRow('Giá tiền', plan.formattedAmount),
+          _buildInfoRow('Trạng thái', plan.status),
           _buildInfoRow('Tiền tệ', plan.currency),
           _buildInfoRow('Chu kỳ', '${plan.billingPeriodCount} ${plan.billingPeriodUnitName}'),
           _buildInfoRow('Ngày dùng thử', '${plan.trialDays ?? 0} ngày'),
