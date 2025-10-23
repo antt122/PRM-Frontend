@@ -136,7 +136,7 @@ class _CreatePlanScreenState extends State<CreateSubscriptionScreen> {
               decoration: const InputDecoration(labelText: 'Trạng thái'),
               items: const [
                 DropdownMenuItem(value: 1, child: Text('Hoạt động (Active)')),
-                DropdownMenuItem(value: 2, child: Text('Không hoạt động (Inactive)')),
+                DropdownMenuItem(value: 0, child: Text('Không hoạt động (Inactive)')),
               ],
               onChanged: (value) => setState(() => _selectedStatus = value ?? 1),
             ),
