@@ -34,10 +34,10 @@ class _PaymentMethodEditScreenState extends ConsumerState<PaymentMethodEditScree
 
     // Mapping từ typeName sang type (int)
     switch(widget.initialData.typeName.toLowerCase()) {
-      case 'banktransfer': _selectedType = 1; break;
-      case 'ewallet': _selectedType = 2; break;
-      case 'card': _selectedType = 3; break;
-      case 'crypto': _selectedType = 4; break;
+      case 'creditcard': _selectedType = 1; break;
+      case 'cash': _selectedType = 2; break;
+      case 'ewallet': _selectedType = 3; break;
+      case 'banktransfer': _selectedType = 4; break;
       default: _selectedType = 1;
     }
     _selectedStatus = widget.initialData.status == 'Active' ? 1 : 0;
@@ -110,10 +110,14 @@ class _PaymentMethodEditScreenState extends ConsumerState<PaymentMethodEditScree
                         value: _selectedType,
                         hint: const Text('Loại *'),
                         items: const [
-                          DropdownMenuItem(value: 1, child: Text('Bank Transfer')),
-                          DropdownMenuItem(value: 2, child: Text('E-Wallet')),
-                          DropdownMenuItem(value: 3, child: Text('Card')),
-                          DropdownMenuItem(value: 4, child: Text('Crypto')),
+                          // DropdownMenuItem(value: 1, child: Text('Bank Transfer')),
+                          // DropdownMenuItem(value: 2, child: Text('E-Wallet')),
+                          // DropdownMenuItem(value: 3, child: Text('Card')),
+                          // DropdownMenuItem(value: 4, child: Text('Crypto')),
+                          DropdownMenuItem(value: 1, child: Text('CreditCard ')),
+                          DropdownMenuItem(value: 2, child: Text('Cash')),
+                          DropdownMenuItem(value: 3, child: Text('EWallet ')),
+                          DropdownMenuItem(value: 4, child: Text('BankTransfer ')),
                         ],
                         onChanged: (v) => setState(() => _selectedType = v!)),
                   ),

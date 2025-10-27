@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/CreatePlanRequest.dart';
-import '../services/api_service.dart';
+import '../services/SubscriptionPlanService.dart';
 
 class CreateSubscriptionScreen extends StatefulWidget {
   const CreateSubscriptionScreen({super.key});
@@ -12,7 +12,7 @@ class CreateSubscriptionScreen extends StatefulWidget {
 
 class _CreatePlanScreenState extends State<CreateSubscriptionScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _apiService = ApiService();
+  final _apiService = SubscriptionPlanService();
   bool _isLoading = false;
 
   // Controllers cho các trường
@@ -136,7 +136,7 @@ class _CreatePlanScreenState extends State<CreateSubscriptionScreen> {
               decoration: const InputDecoration(labelText: 'Trạng thái'),
               items: const [
                 DropdownMenuItem(value: 1, child: Text('Hoạt động (Active)')),
-                DropdownMenuItem(value: 2, child: Text('Không hoạt động (Inactive)')),
+                DropdownMenuItem(value: 0, child: Text('Không hoạt động (Inactive)')),
               ],
               onChanged: (value) => setState(() => _selectedStatus = value ?? 1),
             ),

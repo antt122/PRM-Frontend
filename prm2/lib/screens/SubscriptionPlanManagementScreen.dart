@@ -1,11 +1,78 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/SubscriptionPlan.dart';
-import '../models/SubscriptionPlanFilters.dart';
+import '../providers/SubscriptionPlanFilters.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import 'CreateSubscriptionScreen.dart';
 import 'SubscriptionPlanDetailScreen.dart'; // Giả sử bạn có file màu này
+
+// --- WIDGET MỚI ĐỂ HIỂN THỊ TRẠNG THÁI ---
+// (Bạn có thể đặt widget này ở cuối file hoặc import từ file component)
+class StatusChip extends StatelessWidget {
+  final String? status;
+
+  const StatusChip({Key? key, required this.status}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    Color dotColor;
+    String statusText;
+
+    // Logic màu sắc dựa trên status
+    switch (status?.toLowerCase()) {
+      case 'active':
+        dotColor = Colors.green;
+        statusText = 'Active';
+        break;
+      case 'inactive':
+        dotColor = Colors.red;
+        statusText = 'Inactive';
+        break;
+      case 'pending':
+        dotColor = Colors.orange; // Màu vàng (cam) cho Pending
+        statusText = 'Pending';
+        break;
+      default:
+      // Xử lý các trường hợp khác (null, rỗng, hoặc không xác định)
+        dotColor = Colors.grey;
+        statusText = (status == null || status!.isEmpty) ? 'Unknown' : status!;
+        // Viết hoa chữ cái đầu
+        statusText = statusText[0].toUpperCase() + statusText.substring(1);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        // Dùng màu nền mờ từ theme của bạn
+        color: kAdminInputBorderColor.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16), // Bo tròn
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min, // Chỉ chiếm không gian cần thiết
+        children: [
+          // Chấm tròn màu
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Chữ trạng thái
+          Text(
+            statusText,
+            style: const TextStyle(color: kAdminPrimaryTextColor, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+// --- KẾT THÚC WIDGET STATUSCHIP ---
+
 
 class SubscriptionPlanManagementScreen extends StatefulWidget {
   const SubscriptionPlanManagementScreen({super.key});
@@ -15,7 +82,8 @@ class SubscriptionPlanManagementScreen extends StatefulWidget {
       _SubscriptionPlanManagementScreenState();
 }
 
-class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManagementScreen> {
+class _SubscriptionPlanManagementScreenState
+    extends State<SubscriptionPlanManagementScreen> {
   final ApiService _apiService = ApiService();
   final _searchController = TextEditingController();
   Timer? _debounce;
@@ -24,7 +92,6 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
   String? _error;
   List<SubscriptionPlan> _plans = [];
 
-  // --- THAY ĐỔI: Thêm các biến state để lưu thông tin phân trang từ response ---
   int _currentPage = 1;
   int _totalPages = 1;
 
@@ -51,7 +118,6 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
     setState(() {
       _isLoading = true;
       _error = null;
-      // Cập nhật trang yêu cầu trong bộ lọc
       if (page != null) {
         _currentFilters = _currentFilters.copyWith(pageNumber: page);
       }
@@ -63,7 +129,6 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
       setState(() {
         if (result.isSuccess && result.data != null) {
           _plans = result.data!.items;
-          // --- THAY ĐỔI: Cập nhật state từ response với tên thuộc tính đúng ---
           _currentPage = result.data!.currentPage;
           _totalPages = result.data!.totalPages;
         } else {
@@ -81,7 +146,7 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
       setState(() {
         _currentFilters = _currentFilters.copyWith(
           searchTerm: _searchController.text.trim(),
-          pageNumber: 1, // Reset về trang 1 khi tìm kiếm
+          pageNumber: 1,
         );
       });
       _fetchPlans();
@@ -93,7 +158,8 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
     return Scaffold(
       backgroundColor: kAdminBackgroundColor,
       appBar: AppBar(
-        title: const Text('Quản lý Gói Plan', style: TextStyle(color: kAdminPrimaryTextColor)),
+        title: const Text('Quản lý Gói Plan',
+            style: TextStyle(color: kAdminPrimaryTextColor)),
         backgroundColor: kAdminBackgroundColor,
         iconTheme: const IconThemeData(color: kAdminPrimaryTextColor),
         actions: [
@@ -103,14 +169,13 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
             onPressed: () async {
               final bool? result = await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const CreateSubscriptionScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const CreateSubscriptionScreen()),
               );
-              // Nếu kết quả trả về là true (tức là tạo thành công),
-              // thì tải lại danh sách
               if (result == true) {
                 _fetchPlans();
               }
-              },
+            },
           ),
         ],
       ),
@@ -119,19 +184,26 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
           _buildFilterBar(),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: kAdminAccentColor))
+                ? const Center(
+                child: CircularProgressIndicator(color: kAdminAccentColor))
                 : _error != null
-                ? Center(child: Text('Lỗi: $_error', style: const TextStyle(color: kAdminErrorColor)))
+                ? Center(
+                child: Text('Lỗi: $_error',
+                    style: const TextStyle(color: kAdminErrorColor)))
                 : _plans.isEmpty
-                ? const Center(child: Text('Không tìm thấy gói nào.', style: TextStyle(color: kAdminSecondaryTextColor)))
+                ? const Center(
+                child: Text('Không tìm thấy gói nào.',
+                    style: TextStyle(
+                        color: kAdminSecondaryTextColor)))
                 : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: _plans.length,
-              itemBuilder: (context, index) => _buildPlanCard(_plans[index]),
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) =>
+                  _buildPlanCard(_plans[index]),
+              separatorBuilder: (context, index) =>
+              const SizedBox(height: 12),
             ),
           ),
-          // --- THAY ĐỔI: Bỏ tham số không cần thiết ---
           if (!_isLoading && _totalPages > 1) _buildPaginationControls(),
         ],
       ),
@@ -150,10 +222,13 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
               decoration: InputDecoration(
                 hintText: 'Tìm kiếm theo tên gói...',
                 hintStyle: const TextStyle(color: kAdminSecondaryTextColor),
-                prefixIcon: const Icon(Icons.search, color: kAdminSecondaryTextColor),
+                prefixIcon:
+                const Icon(Icons.search, color: kAdminSecondaryTextColor),
                 filled: true,
                 fillColor: kAdminCardColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none),
               ),
             ),
           ),
@@ -163,6 +238,7 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
     );
   }
 
+  // --- HÀM _buildPlanCard ĐÃ ĐƯỢC CẬP NHẬT ---
   Widget _buildPlanCard(SubscriptionPlan plan) {
     return InkWell(
       onTap: () {
@@ -172,8 +248,6 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
             builder: (context) => SubscriptionPlanDetailScreen(planId: plan.id),
           ),
         ).then((_) {
-          // Khi quay lại từ màn hình chi tiết, tải lại dữ liệu để cập nhật
-          // thay đổi nếu có (ví dụ sau khi Edit hoặc Delete)
           _fetchPlans();
         });
       },
@@ -188,57 +262,66 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Dòng trên cùng
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Căn lề trên để chip và title thẳng hàng
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Tên plan
                 Expanded(
                   child: Text(
                     plan.displayName,
-                    style: const TextStyle(color: kAdminPrimaryTextColor, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: kAdminPrimaryTextColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                 ),
-                _buildStatusChip(plan.isActive),
+                const SizedBox(width: 8), // Khoảng cách
+
+                // --- THÊM STATUSCHIP VÀO ĐÂY ---
+                StatusChip(status: plan.status),
               ],
             ),
             const SizedBox(height: 4),
-            Text('Tên mã: ${plan.name}', style: const TextStyle(color: kAdminSecondaryTextColor)),
+            Text('Tên mã: ${plan.name}',
+                style: const TextStyle(color: kAdminSecondaryTextColor)),
+
+            // --- ĐÃ XÓA DÒNG TEXT TRẠNG THÁI Ở ĐÂY ---
+
             const Divider(height: 20, color: kAdminInputBorderColor),
-            _buildInfoRow(Icons.price_change_outlined, '${plan.formattedAmount} / ${plan.billingPeriodUnitName}'),
+            _buildInfoRow(Icons.price_change_outlined,
+                '${plan.formattedAmount} / ${plan.billingPeriodUnitName}'),
             const SizedBox(height: 8),
             if (plan.trialDays != null && plan.trialDays! > 0)
-              _buildInfoRow(Icons.timer_outlined, 'Dùng thử: ${plan.trialDays} ngày'),
+              _buildInfoRow(
+                  Icons.timer_outlined, 'Dùng thử: ${plan.trialDays} ngày'),
             const SizedBox(height: 8),
-            _buildInfoRow(Icons.calendar_today_outlined, 'Ngày tạo: ${plan.formattedCreatedAt}'),
+            _buildInfoRow(
+                Icons.calendar_today_outlined, 'Ngày tạo: ${plan.formattedCreatedAt}'),
           ],
         ),
       ),
     );
   }
+  // --- KẾT THÚC HÀM _buildPlanCard ---
 
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(
       children: [
         Icon(icon, size: 16, color: kAdminSecondaryTextColor),
         const SizedBox(width: 8),
-        Expanded(child: Text(text, style: const TextStyle(color: kAdminSecondaryTextColor), overflow: TextOverflow.ellipsis)),
+        Expanded(
+            child: Text(text,
+                style: const TextStyle(color: kAdminSecondaryTextColor),
+                overflow: TextOverflow.ellipsis)),
       ],
     );
   }
 
-  Widget _buildStatusChip(bool isActive) {
-    final String label = isActive ? 'Hoạt động' : 'Không hoạt động';
-    final Color color = isActive ? Colors.green : kAdminErrorColor;
-    return Chip(
-      label: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
-      backgroundColor: color.withOpacity(0.15),
-      padding: EdgeInsets.zero,
-      side: BorderSide.none,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
-  }
-
-  // --- THAY ĐỔI: Cập nhật lại toàn bộ widget này để dùng state ---
   Widget _buildPaginationControls() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -247,7 +330,8 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: const Icon(Icons.chevron_left, color: kAdminSecondaryTextColor),
+            icon:
+            const Icon(Icons.chevron_left, color: kAdminSecondaryTextColor),
             onPressed: _currentPage > 1
                 ? () => _fetchPlans(page: _currentPage - 1)
                 : null,
@@ -257,7 +341,8 @@ class _SubscriptionPlanManagementScreenState extends State<SubscriptionPlanManag
             style: const TextStyle(color: kAdminSecondaryTextColor),
           ),
           IconButton(
-            icon: const Icon(Icons.chevron_right, color: kAdminSecondaryTextColor),
+            icon:
+            const Icon(Icons.chevron_right, color: kAdminSecondaryTextColor),
             onPressed: _currentPage < _totalPages
                 ? () => _fetchPlans(page: _currentPage + 1)
                 : null,

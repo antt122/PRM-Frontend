@@ -7,19 +7,22 @@ import '../providers/PaymentMethodFilter.dart';
 import '../utils/app_colors.dart';
 import 'PaymentMethodEditScreen.dart';
 
-
-
 // --- CHUYỂN SANG STATEFUL WIDGET ĐỂ QUẢN LÝ STATE ---
 class PaymentMethodDetailScreen extends ConsumerStatefulWidget {
   final String methodId;
   const PaymentMethodDetailScreen({super.key, required this.methodId});
 
   @override
-  ConsumerState<PaymentMethodDetailScreen> createState() => _PaymentMethodDetailScreenState();
+  ConsumerState<PaymentMethodDetailScreen> createState() =>
+      _PaymentMethodDetailScreenState();
 }
 
-class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailScreen> {
+class _PaymentMethodDetailScreenState
+    extends ConsumerState<PaymentMethodDetailScreen> {
   bool _isProcessing = false;
+
+  // --- THAY ĐỔI 1: Thêm biến cờ để "nhớ" trạng thái cập nhật ---
+  bool _didUpdate = false;
 
   // --- HÀM XỬ LÝ XÓA ---
   Future<void> _handleDelete() async {
@@ -31,9 +34,12 @@ class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailS
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Xác nhận xóa'),
-        content: Text('Bạn có chắc chắn muốn xóa vĩnh viễn phương thức "${method.name}"?'),
+        content:
+        Text('Bạn có chắc chắn muốn xóa vĩnh viễn phương thức "${method.name}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy')),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: kAdminErrorColor),
@@ -45,11 +51,14 @@ class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailS
 
     if (confirm == true) {
       setState(() => _isProcessing = true);
-      final result = await ref.read(paymentMethodServiceProvider).deletePaymentMethod(widget.methodId);
+      final result = await ref
+          .read(paymentMethodServiceProvider)
+          .deletePaymentMethod(widget.methodId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.message ?? (result.isSuccess ? '✅ Xóa thành công!' : '❌ Lỗi')),
+            content:
+            Text(result.message ?? (result.isSuccess ? '✅ Xóa thành công!' : '❌ Lỗi')),
             backgroundColor: result.isSuccess ? Colors.green : kAdminErrorColor,
           ),
         );
@@ -65,68 +74,94 @@ class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailS
   Widget build(BuildContext context) {
     final detailAsync = ref.watch(paymentMethodDetailProvider(widget.methodId));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chi tiết Phương thức'),
-        actions: [
-          if (detailAsync.hasValue && detailAsync.value!.isSuccess)
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Chỉnh sửa',
-              onPressed: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => PaymentMethodEditScreen(initialData: detailAsync.value!.data!)),
-                );
-                if (result == true) {
-                  ref.refresh(paymentMethodDetailProvider(widget.methodId));
+    // --- THAY ĐỔI 2: Bọc Scaffold bằng WillPopScope ---
+    // WillPopScope can thiệp vào hành động khi người dùng bấm "Back"
+    return WillPopScope(
+      onWillPop: () async {
+        // Khi người dùng bấm back, trả về giá trị của _didUpdate
+        // (sẽ là 'true' nếu đã sửa, 'false' nếu chỉ xem)
+        Navigator.pop(context, _didUpdate);
+        // Ngăn hành động pop mặc định vì chúng ta đã tự pop
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Chi tiết Phương thức'),
+          actions: [
+            if (detailAsync.hasValue && detailAsync.value!.isSuccess)
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Chỉnh sửa',
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => PaymentMethodEditScreen(
+                            initialData: detailAsync.value!.data!)),
+                  );
+                  if (result == true) {
+                    // --- THAY ĐỔI 3: Đặt cờ _didUpdate thành true ---
+                    // "Nhớ" rằng đã có một bản cập nhật thành công
+                    setState(() {
+                      _didUpdate = true;
+                    });
+
+                    // Refresh lại màn hình chi tiết này (đã đúng)
+                    ref.refresh(paymentMethodDetailProvider(widget.methodId));
+                  }
+                },
+              ),
+            // --- THÊM MENU VỚI TÙY CHỌN XÓA ---
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'delete') {
+                  _handleDelete();
                 }
               },
-            ),
-          // --- THÊM MENU VỚI TÙY CHỌN XÓA ---
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'delete') {
-                _handleDelete();
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                value: 'delete',
-                child: ListTile(
-                  leading: Icon(Icons.delete_outline, color: kAdminErrorColor),
-                  title: Text('Xóa', style: TextStyle(color: kAdminErrorColor)),
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline, color: kAdminErrorColor),
+                    title:
+                    Text('Xóa', style: TextStyle(color: kAdminErrorColor)),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: _isProcessing
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-        onRefresh: () => ref.refresh(paymentMethodDetailProvider(widget.methodId).future),
-        child: detailAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator(color: kAdminAccentColor)),
-          error: (err, st) => Center(child: Text('Lỗi tải dữ liệu: $err')),
-          data: (apiResult) {
-            if (!apiResult.isSuccess || apiResult.data == null) {
-              return Center(child: Text(apiResult.message ?? 'Không tìm thấy dữ liệu.'));
-            }
-            final method = apiResult.data!;
-            return ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                _buildInfoCard(context, method),
               ],
-            );
-          },
+            ),
+          ],
+        ),
+        body: _isProcessing
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+          onRefresh: () => ref
+              .refresh(paymentMethodDetailProvider(widget.methodId).future),
+          child: detailAsync.when(
+            loading: () => const Center(
+                child: CircularProgressIndicator(color: kAdminAccentColor)),
+            error: (err, st) =>
+                Center(child: Text('Lỗi tải dữ liệu: $err')),
+            data: (apiResult) {
+              if (!apiResult.isSuccess || apiResult.data == null) {
+                return Center(
+                    child:
+                    Text(apiResult.message ?? 'Không tìm thấy dữ liệu.'));
+              }
+              final method = apiResult.data!;
+              return ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  _buildInfoCard(context, method),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
-  // --- CÁC HÀM HELPER BUILD UI ---
+  // --- CÁC HÀM HELPER BUILD UI (Giữ nguyên) ---
   Widget _buildInfoCard(BuildContext context, PaymentMethodDetail method) {
     final bool isActive = method.status == 'Active';
     final statusColor = isActive ? Colors.green : kAdminSecondaryTextColor;
@@ -141,7 +176,11 @@ class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailS
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(method.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  child: Text(method.name,
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold)),
                 ),
                 Chip(
                   avatar: Icon(Icons.circle, size: 12, color: statusColor),
@@ -151,28 +190,36 @@ class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailS
               ],
             ),
             const SizedBox(height: 4),
-            Text('Provider: ${method.providerName}', style: const TextStyle(color: kAdminSecondaryTextColor, fontWeight: FontWeight.w500)),
+            Text('Provider: ${method.providerName}',
+                style: const TextStyle(
+                    color: kAdminSecondaryTextColor,
+                    fontWeight: FontWeight.w500)),
             const Divider(height: 32),
             _buildInfoRow(context, 'Mô tả', method.description),
             _buildInfoRow(context, 'Loại', method.typeName),
-            _buildInfoRow(context, 'Cấu hình', method.configuration, isCode: true),
+            _buildInfoRow(context, 'Cấu hình', method.configuration,
+                isCode: true),
             const Divider(height: 32),
             _buildAuditRow('Tạo bởi', method.createdBy, method.formattedCreatedAt),
             if (method.updatedBy != null)
-              _buildAuditRow('Cập nhật bởi', method.updatedBy, method.formattedUpdatedAt),
+              _buildAuditRow(
+                  'Cập nhật bởi', method.updatedBy, method.formattedUpdatedAt),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(BuildContext context, String label, String value, {bool isCode = false}) {
+  Widget _buildInfoRow(BuildContext context, String label, String value,
+      {bool isCode = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: kAdminSecondaryTextColor, fontSize: 14)),
+          Text(label,
+              style:
+              const TextStyle(color: kAdminSecondaryTextColor, fontSize: 14)),
           const SizedBox(height: 4),
           isCode
               ? Container(
@@ -182,7 +229,8 @@ class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailS
               color: kAdminBackgroundColor.withOpacity(0.5),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(value, style: const TextStyle(fontFamily: 'monospace')),
+            child:
+            Text(value, style: const TextStyle(fontFamily: 'monospace')),
           )
               : Text(value, style: Theme.of(context).textTheme.bodyLarge),
         ],
@@ -190,22 +238,20 @@ class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailS
     );
   }
 
-// HÀM _buildAuditRow ĐÃ SỬA LỖI
   Widget _buildAuditRow(String label, String? user, String date) {
     return Padding(
       padding: const EdgeInsets.only(top: 8.0),
       child: Row(
-        // Canh icon và text thẳng hàng theo chiều dọc
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.person_outline, size: 16, color: kAdminSecondaryTextColor),
+          const Icon(Icons.person_outline,
+              size: 16, color: kAdminSecondaryTextColor),
           const SizedBox(width: 8),
-          // THAY ĐỔI QUAN TRỌNG NHẤT: BỌC TEXT BẰNG EXPANDED
           Expanded(
             child: Text(
               '$label ${user ?? 'N/A'} • $date',
-              style: const TextStyle(color: kAdminSecondaryTextColor, fontSize: 12),
-              // softWrap: true là mặc định, nhưng để đây cho rõ ràng
+              style: const TextStyle(
+                  color: kAdminSecondaryTextColor, fontSize: 12),
               softWrap: true,
             ),
           ),
@@ -214,4 +260,3 @@ class _PaymentMethodDetailScreenState extends ConsumerState<PaymentMethodDetailS
     );
   }
 }
-
