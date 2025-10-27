@@ -191,7 +191,7 @@ class _UserManagementScreenState
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(user.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  _buildStatusChip(user.status),
+                  // _buildStatusChip(user.status),
                 ],
               ),
               const SizedBox(height: 4),
@@ -233,16 +233,16 @@ class _UserManagementScreenState
     );
   }
 
-  Widget _buildStatusChip(int status) {
-    String label;
-    Color color;
-    switch (status) {
-      case 0: label = 'Hoạt động'; color = Colors.green; break;
-      case 1: label = 'Vô hiệu hóa'; color = Colors.red; break;
-      case 2: label = 'Chờ xử lý'; color = Colors.orange; break;
-      default: label = 'Không rõ'; color = Colors.grey;
-    }
-    return Chip(label: Text(label), backgroundColor: color.withOpacity(0.2));
-  }
+  // Widget _buildStatusChip(int status) {
+  //   String label;
+  //   Color color;
+  //   switch (status) {
+  //     case 0: label = 'Hoạt động'; color = Colors.green; break;
+  //     case 1: label = 'Vô hiệu hóa'; color = Colors.red; break;
+  //     case 2: label = 'Chờ xử lý'; color = Colors.orange; break;
+  //     default: label = 'Không rõ'; color = Colors.grey;
+  //   }
+  //   return Chip(label: Text(label), backgroundColor: color.withOpacity(0.2));
+  // }
 }
 
